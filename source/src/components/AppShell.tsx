@@ -1,10 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { CollectionTree } from "@/components/CollectionTree";
+import { NewCollectionButton } from "@/components/CollectionDialog";
+import type { TreeNode } from "@/lib/collections";
 
 type U = { displayName: string; email: string; role: "admin" | "member" };
 
-export function AppShell({ user, children }: { user: U; children: React.ReactNode }) {
+export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; children: React.ReactNode }) {
   const path = usePathname();
   const item = (href: string, label: string) => {
     const active = href === "/" ? path === "/" : path.startsWith(href);
@@ -28,6 +31,8 @@ export function AppShell({ user, children }: { user: U; children: React.ReactNod
         </div>
         <nav className="space-y-0.5" aria-label="เมนูหลัก">
           {item("/", "หน้าแรก")}
+          {item("/inbox", "Inbox")}
+          {item("/mine", "ของฉัน")}
           {user.role === "admin" && (
             <>
               <p className="px-3 pb-1 pt-4 text-[13px] font-semibold text-muted">ผู้ดูแลระบบ</p>
@@ -35,6 +40,11 @@ export function AppShell({ user, children }: { user: U; children: React.ReactNod
             </>
           )}
         </nav>
+        <div className="mb-1 mt-5 flex items-center justify-between px-3">
+          <p className="text-[13px] font-semibold text-muted">Collections</p>
+          <NewCollectionButton />
+        </div>
+        <CollectionTree nodes={tree} />
       </aside>
       <div className="min-w-0 flex-[999_1_560px]">
         <header className="flex items-center justify-end gap-3 border-b border-[var(--border-nav)] px-8 py-3">
@@ -42,6 +52,7 @@ export function AppShell({ user, children }: { user: U; children: React.ReactNod
             <div className="text-text-2">{user.displayName}</div>
             <div className="text-muted">{user.email}</div>
           </div>
+          <Link href="/new?type=note" className="mr-auto rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:brightness-110">+ สร้างใหม่</Link>
           <Link href="/change-password" className="rounded-lg px-3 py-2 text-xs text-muted hover:bg-surface-hover">เปลี่ยนรหัสผ่าน</Link>
           <button onClick={logout} className="rounded-lg border border-[var(--border-strong)] px-3 py-2 text-xs text-text-2 hover:bg-surface-hover">ออกจากระบบ</button>
         </header>

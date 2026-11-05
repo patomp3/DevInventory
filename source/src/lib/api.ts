@@ -32,3 +32,29 @@ export async function requireAdmin(req: Request): Promise<SessionUser | Response
   if (u.role !== "admin") return fail(404, "not_found"); // ไม่เปิดเผยว่ามีหน้านี้
   return u;
 }
+
+import { AppError } from "@/lib/errors";
+import { toCtx } from "@/lib/auth/session";
+import type { Ctx } from "@/lib/permissions";
+
+/** route สำหรับผู้ใช้ที่ login แล้ว: ตรวจ Origin (CSRF), session, และแปลง AppError เป็น HTTP response */
+export function userRoute<P = Record<string, string>>(
+  fn: (a: { req: Request; ctx: Ctx; user: SessionUser; params: P }) => Promise<Response>,
+) {
+  return async (req: Request, { params }: { params: Promise<P> }) => {
+    try {
+      if (req.method !== "GET" && !originOk(req)) return fail(403, "bad_origin");
+      const user = await getSessionUser();
+      if (!user) return fail(401, "unauthenticated");
+      if (user.mustChangePassword) return fail(403, "must_change_password");
+      return await fn({ req, ctx: toCtx(user), user, params: await params });
+    } catch (e) {
+      if (e instanceof AppError) return fail(e.status, e.code, e.extra);
+      throw e;
+    }
+  };
+}
+
+export async function readJson(req: Request): Promise<unknown> {
+  return req.json().catch(() => { throw new AppError(400, "invalid_json"); });
+}

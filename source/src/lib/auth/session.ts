@@ -31,3 +31,23 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 export function toCtx(u: SessionUser): Ctx {
   return { userId: u.id, workspaceId: u.workspaceId, role: u.role };
 }
+
+import { notFound as nextNotFound, redirect } from "next/navigation";
+import { AppError } from "@/lib/errors";
+
+/** สำหรับ server component: ต้อง login (layout ตรวจแล้ว แต่ page ต้องใช้ ctx เอง) */
+export async function requireCtx() {
+  const u = await getSessionUser();
+  if (!u) redirect("/login");
+  return { user: u, ctx: toCtx(u) };
+}
+
+/** AppError 404/403 → หน้า 404 ของ Next (ไม่แยกว่าไม่มีหรือไม่มีสิทธิ์) */
+export async function orNotFound<T>(p: Promise<T>): Promise<T> {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof AppError && (e.status === 404 || e.status === 403)) nextNotFound();
+    throw e;
+  }
+}
