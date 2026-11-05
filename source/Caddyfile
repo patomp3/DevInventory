@@ -1,5 +1,0 @@
-{$APP_DOMAIN} {
-	encode zstd gzip
-	reverse_proxy app:3000
-	# ถ้าใช้เฉพาะในเครือข่ายภายใน ให้เพิ่ม "tls internal" (design.md §14)
-}
