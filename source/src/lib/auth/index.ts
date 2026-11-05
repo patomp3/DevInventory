@@ -14,7 +14,10 @@ function create() {
     appName: "Dev Inventory",
     baseURL: e.APP_BASE_URL,
     secret: e.BETTER_AUTH_SECRET,
-    trustedOrigins: [e.APP_BASE_URL],
+    trustedOrigins:
+      process.env.NODE_ENV === "production"
+        ? [e.APP_BASE_URL]
+        : [e.APP_BASE_URL, "http://localhost:*", "http://127.0.0.1:*"], // dev: พอร์ตอาจไม่ใช่ 3000
     database: drizzleAdapter(db(), {
       provider: "pg",
       schema: { users, session, account, verification },

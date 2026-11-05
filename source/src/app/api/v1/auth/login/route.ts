@@ -28,12 +28,14 @@ export async function POST(req: Request) {
     try {
       await getAuth().api.signInEmail({ body: { email, password: parsed.data.password }, headers: req.headers });
       ok = true;
-    } catch {
+    } catch (e) {
       ok = false;
+      if (process.env.NODE_ENV !== "production") console.error("[login] signInEmail failed:", e); // เห็นสาเหตุจริงใน terminal ตอน dev
     }
   }
 
   if (!ok) {
+    if (process.env.NODE_ENV !== "production" && !(u && u.status === "active")) console.warn(`[login] ไม่พบผู้ใช้ที่ active สำหรับ ${email} — ลอง npm run doctor`);
     await db().insert(loginAttempts).values({ email, ip });
     const remaining = Math.max(0, MAX_ATTEMPTS - (n + 1));
     // ข้อความเดียวทุกกรณี ไม่บอกว่าผิดช่องไหนหรือมีอีเมลนี้หรือไม่
