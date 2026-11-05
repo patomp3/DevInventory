@@ -21,21 +21,38 @@
 | Snippet / Script (CodeMirror, Shiki), tag | สัปดาห์ 4 |
 | ไฟล์แนบ, หน้า History, ถังขยะ, ค้นหา, Ctrl+K | สัปดาห์ 5–7 |
 
-## เริ่มใช้งาน
+## รันบนเครื่อง (พัฒนา)
 
 ```bash
-cp .env.example .env        # แก้ค่า (รวม BETTER_AUTH_SECRET และ INITIAL_ADMIN_*)
 npm install
-docker compose up -d db     # Postgres (ICU th-TH)
-DATABASE_URL=postgres://inventory:change-me@localhost:5432/inventory npm run db:migrate
-DATABASE_URL=... npm run db:seed   # สร้าง Super Admin คนแรกจาก INITIAL_ADMIN_* (รันซ้ำได้)
-npm test && npm run typecheck
-npm run dev
+cp .env.example .env
 ```
 
-> ต้อง publish พอร์ต 5432 ของ db (เพิ่ม `ports: ["5432:5432"]` ชั่วคราว) ถ้าจะรัน migrate/PoC จากเครื่อง host
+แก้ `.env` สำหรับรันบนเครื่อง (ไม่ใช่ใน Docker):
 
-รัน PoC ซ้ำบนข้อมูลของคุณเอง: `DATABASE_URL=... npm run poc:search` (ปรับจำนวนแถวด้วย `POC_ROWS`)
+| ตัวแปร | ค่าสำหรับ dev |
+|---|---|
+| `APP_BASE_URL` | `http://localhost:3000` (ถ้าเป็น https ที่ไม่ตรงกับที่เปิด cookie/Origin จะไม่ทำงาน) |
+| `DATABASE_URL` | `postgres://<user>:<password>@localhost:5432/<db>` (host `db` ใช้ได้เฉพาะภายใน Docker) |
+| `BETTER_AUTH_SECRET` | สตริงสุ่มยาว ≥ 32 ตัวอักษร เช่น `openssl rand -base64 32` |
+| `INITIAL_ADMIN_EMAIL` / `_PASSWORD` | Admin คนแรก (รหัสผ่าน ≥ 10 ตัว) |
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db   # Postgres + เปิดพอร์ต 5432
+npm run db:migrate     # สร้างตาราง (อ่าน .env เอง)
+npm run db:seed        # สร้าง Admin คนแรก (รันซ้ำได้)
+npm run dev            # http://localhost:3000
+```
+
+เข้า `/login` ด้วย `INITIAL_ADMIN_*` → ระบบบังคับตั้งรหัสใหม่ → Admin › ผู้ใช้ › "เชิญด้วยอีเมล" (ไม่มีการส่งอีเมลในเฟส 1 ให้ copy ลิงก์ส่งเอง)
+
+ทดสอบ: `npm test` · `npm run typecheck` · `npm run poc:search` (Thai search PoC)
+
+## รันด้วย Docker ทั้งชุด
+
+ตั้ง `.env` ให้ `DATABASE_URL` ใช้ host `db` และ `APP_BASE_URL` เป็นโดเมนจริง แล้ว `docker compose up -d --build` (service `migrate` จะ migrate + seed ให้)
+
+`scripts/e2e-items.sh` ทดสอบ Collection/รายการ (สิทธิ์ การสืบทอด 409 ความลึก) ส่วน `scripts/e2e-auth.sh` ทดสอบ flow login/เชิญ/รีเซ็ตรหัส/ปิดบัญชี กับเซิร์ฟเวอร์ที่รันอยู่
 
 ## โครงสร้าง
 
