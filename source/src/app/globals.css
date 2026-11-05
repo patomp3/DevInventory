@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+/* tokens ตาม ui-design.md §3.4 */
+:root {
+  --bg: #0e1013;           --sidebar: #12151a;       --surface: #161a20;
+  --surface-hover: #1b2027; --code-bg: #0b0d10;
+  --border: #262b33;       --border-nav: #232830;    --border-row: #1e232a; --border-strong: #2f3640;
+  --text: #e7eaf0;         --text-secondary: #c3cad6; --text-muted: #98a2b3; --text-faint: #7d8797;
+  --accent: #f2b84b;       --accent-soft: rgb(242 184 75 / 0.14); --on-accent: #1a1305;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-sidebar: var(--sidebar);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-code: var(--code-bg);
+  --color-line: var(--border);
+  --color-text: var(--text);
+  --color-text-2: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --font-sans: "IBM Plex Sans Thai", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+a:focus-visible, button:focus-visible, input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

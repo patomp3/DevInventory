@@ -1,0 +1,59 @@
+# เฟส 1 — ตาม design.md §15.1
+# ใช้: cp .env.example .env แล้วแก้ค่า จากนั้น docker compose up -d --build
+services:
+  # รัน migration + สร้าง Super Admin คนแรก (ข้ามถ้ามีผู้ใช้แล้ว) แล้วจบ
+  migrate:
+    build: { context: ., target: build }
+    command: sh -c "npm run db:migrate && npm run db:seed"
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    build: .
+    env_file: .env
+    volumes:
+      - files:/data/files
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      # ICU th-TH เพื่อให้ pg_trgm นับอักษรไทยเป็นตัวอักษร (design.md §8.8)
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=th-TH --encoding=UTF8"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # backup (pg_dump + restic) จะเพิ่มในสัปดาห์ 7 ตามแผน §17
+
+volumes:
+  files:
+  pgdata:
+  caddy:
