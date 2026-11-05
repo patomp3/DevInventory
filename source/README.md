@@ -33,12 +33,12 @@ cp .env.example .env
 | ตัวแปร | ค่าสำหรับ dev |
 |---|---|
 | `APP_BASE_URL` | `http://localhost:3000` (ถ้าเป็น https ที่ไม่ตรงกับที่เปิด cookie/Origin จะไม่ทำงาน) |
-| `DATABASE_URL` | `postgres://<user>:<password>@localhost:5432/<db>` (host `db` ใช้ได้เฉพาะภายใน Docker) |
+| `DATABASE_URL` | `postgres://<user>:<password>@localhost:5433/<db>` (host `db` ใช้ได้เฉพาะภายใน Docker) |
 | `BETTER_AUTH_SECRET` | สตริงสุ่มยาว ≥ 32 ตัวอักษร เช่น `openssl rand -base64 32` |
 | `INITIAL_ADMIN_EMAIL` / `_PASSWORD` | Admin คนแรก (รหัสผ่าน ≥ 10 ตัว) |
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db   # Postgres + เปิดพอร์ต 5432
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db   # Postgres + เปิดพอร์ต 5433 (เลี่ยงชนกับ Postgres อื่นในเครื่อง)
 npm run db:migrate     # สร้างตาราง (อ่าน .env เอง)
 npm run db:seed        # สร้าง Admin คนแรก (รันซ้ำได้)
 npm run dev            # http://localhost:3000

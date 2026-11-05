@@ -1,7 +1,7 @@
 # ใช้ตอนพัฒนาบนเครื่อง: เปิดพอร์ต Postgres ให้ npm run dev / db:migrate เชื่อมได้
 #   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d db
-# แล้วตั้ง DATABASE_URL ใน .env ให้ใช้ localhost (ไม่ใช่ host "db")
+# แล้วตั้ง DATABASE_URL ใน .env ให้ใช้ localhost:5433 (ไม่ใช่ host "db")
 services:
   db:
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
