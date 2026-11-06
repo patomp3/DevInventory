@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { fail, json, requireAdmin } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
+import { isUuid } from "@/lib/uuid";
 import { account, session, users } from "@/lib/db/schema";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"; // ไม่มีตัวที่สับสน (0/O, 1/l/I)
@@ -13,6 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const me = await requireAdmin(req);
   if (me instanceof Response) return me;
   const { id } = await params;
+  if (!isUuid(id)) return fail(404, "not_found");
   const [target] = await db().select().from(users).where(and(eq(users.id, id), eq(users.workspaceId, me.workspaceId))).limit(1);
   if (!target) return fail(404, "not_found");
   if (target.status !== "active") return fail(409, "user_disabled");

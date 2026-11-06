@@ -1,0 +1,82 @@
+# CI (design.md §16.4): typecheck, unit test, build, แล้วรัน permission matrix + e2e จริงกับ PostgreSQL 17 (ICU th-TH)
+# เซิร์ฟเวอร์ในงานนี้ต่อ DB ด้วย role สิทธิ์ต่ำ inventory_app เหมือน production (migration 0004)
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+permissions: { contents: read }
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run: { working-directory: source }
+    services:
+      db:
+        image: postgres:17
+        env:
+          POSTGRES_USER: inventory
+          POSTGRES_PASSWORD: ci-owner-pass
+          POSTGRES_DB: inventory
+          POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=th-TH --encoding=UTF8"
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U inventory -d inventory"
+          --health-interval 5s --health-timeout 3s --health-retries 15
+    env:
+      # เจ้าของฐานข้อมูล (migrate / seed / ตั้งค่าข้อมูลทดสอบ) และ role สิทธิ์ต่ำที่เซิร์ฟเวอร์ใช้
+      DATABASE_URL: postgres://inventory:ci-owner-pass@localhost:5432/inventory
+      APP_DB_PASSWORD: ci-app-role-password-123456
+      APP_BASE_URL: http://localhost:3100
+      BETTER_AUTH_SECRET: ci-only-secret-not-used-anywhere-else-0123456789
+      INITIAL_ADMIN_EMAIL: admin@example.com
+      INITIAL_ADMIN_PASSWORD: ci-initial-admin-pass-1
+      FILES_DIR: ./data/files
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: source/package-lock.json }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: npm audit (ล้มเมื่อมีช่องโหว่ระดับ critical)
+        run: npm audit --omit=dev --audit-level=critical
+      - run: npm run build
+      - name: Migrate + seed + เปิดใช้ role สิทธิ์ต่ำ
+        run: |
+          npm run db:migrate
+          npm run db:seed
+          npm run db:app-user
+      - name: เริ่มเซิร์ฟเวอร์ (ต่อ DB ด้วย role inventory_app)
+        run: |
+          DATABASE_URL="postgres://inventory_app:${APP_DB_PASSWORD}@localhost:5432/inventory" \
+            nohup npx next start -p 3100 > /tmp/server.log 2>&1 &
+          for i in $(seq 1 40); do curl -sf http://localhost:3100/api/health >/dev/null && exit 0; sleep 1; done
+          echo "เซิร์ฟเวอร์ไม่พร้อม"; cat /tmp/server.log; exit 1
+      - name: Permission matrix (§16.1) + flow หลัก (§16.3)
+        run: npm run e2e:matrix
+      - name: e2e รายการ/ไฟล์แนบ/ประวัติ/ค้นหา/ถังขยะ/Admin
+        run: |
+          npx tsx scripts/e2e-workspace.ts /tmp/e2e-items.env
+          set -a; . /tmp/e2e-items.env; set +a
+          B=http://localhost:3100 PSQL="psql $DATABASE_URL" PY=python3 bash scripts/e2e-items.sh | tee /tmp/items.out
+          tail -1 /tmp/items.out | grep -q "failed=0"
+      - name: e2e auth / คำเชิญ / ความปลอดภัย / role ฐานข้อมูล
+        run: |
+          npx tsx scripts/e2e-workspace.ts /tmp/e2e-auth.env
+          set -a; . /tmp/e2e-auth.env; set +a
+          B=http://localhost:3100 PSQL="psql $DATABASE_URL" PY=python3 INVITE_EMAIL="$INVITE_EMAIL" bash scripts/e2e-auth.sh | tee /tmp/auth.out
+          tail -1 /tmp/auth.out | grep -q "failed=0"
+      - name: Restore test (pg_dump → ฐานข้อมูลชั่วคราว)
+        run: |
+          pg_dump -Fc "$DATABASE_URL" > ./ci.dump
+          # restore-test.sh ใช้ docker; ใน CI กู้ตรงด้วย psql/pg_restore ลง DB ชั่วคราวแล้วตรวจ trigger append-only
+          psql "${DATABASE_URL%/inventory}/postgres" -c "CREATE DATABASE inventory_restore_test TEMPLATE template0 LOCALE_PROVIDER icu ICU_LOCALE 'th-TH' ENCODING 'UTF8'"
+          pg_restore -d "${DATABASE_URL%/inventory}/inventory_restore_test" --no-owner ./ci.dump
+          test "$(psql "${DATABASE_URL%/inventory}/inventory_restore_test" -t -A -c 'select count(*) from users')" -gt 0
+          psql "${DATABASE_URL%/inventory}/inventory_restore_test" -c "update audit_logs set action = action where id = (select min(id) from audit_logs)" 2>&1 | grep -q "append-only"
+      - if: failure()
+        run: tail -n 80 /tmp/server.log || true

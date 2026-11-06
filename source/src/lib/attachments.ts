@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import { attachments, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { AppError, notFound } from "@/lib/errors";
+import { isUuid } from "@/lib/uuid";
 import { loadItem, refreshSearchText } from "@/lib/items";
 import { canEdit, type Ctx } from "@/lib/permissions";
 
@@ -81,6 +82,7 @@ export async function uploadAttachment(ctx: Ctx, itemId: string, file: File, req
 
 /** โหลดไฟล์แนบสำหรับดาวน์โหลด: attachment → รายการแม่ → canView (ไม่ผ่าน/ไม่มี/ถูกลบ = 404 เหมือนกันหมด) */
 export async function getAttachmentForDownload(ctx: Ctx, id: string) {
+  if (!isUuid(id)) throw notFound();
   const [a] = await db().select().from(attachments)
     .where(and(eq(attachments.id, id), eq(attachments.workspaceId, ctx.workspaceId), isNull(attachments.deletedAt)));
   if (!a) throw notFound();
@@ -90,6 +92,7 @@ export async function getAttachmentForDownload(ctx: Ctx, id: string) {
 
 /** ลบแบบ soft delete (ไฟล์จริงลบตอน purge จากถังขยะ สัปดาห์ 7) — ต้อง canEdit รายการแม่ */
 export async function deleteAttachment(ctx: Ctx, id: string, req: Request | null) {
+  if (!isUuid(id)) throw notFound();
   await db().transaction(async (tx) => {
     const [a] = await tx.select().from(attachments)
       .where(and(eq(attachments.id, id), eq(attachments.workspaceId, ctx.workspaceId), isNull(attachments.deletedAt)));

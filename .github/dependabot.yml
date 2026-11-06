@@ -1,0 +1,16 @@
+# อัปเดต dependency อัตโนมัติ (design.md §14 "Dependency") — เปิด PR รายสัปดาห์ ไม่ merge เอง
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /source
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /source
+    schedule: { interval: weekly }

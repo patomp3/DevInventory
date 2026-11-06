@@ -13,6 +13,9 @@ services:
   app:
     build: .
     env_file: .env
+    environment:
+      # แอปใช้ role สิทธิ์ต่ำ (APP_DATABASE_URL) ถ้าตั้งไว้ — ไม่งั้นใช้ DATABASE_URL เดิม (ดู docs/runbook.md §0)
+      DATABASE_URL: ${APP_DATABASE_URL:-${DATABASE_URL}}
     volumes:
       - files:/data/files
     depends_on:
@@ -56,6 +59,8 @@ services:
     build: { context: ., target: build }
     command: sh -c "while true; do npm run job:purge; sleep 86400; done"
     env_file: .env
+    environment:
+      DATABASE_URL: ${APP_DATABASE_URL:-${DATABASE_URL}}
     volumes:
       - files:/data/files
     depends_on:

@@ -8,6 +8,7 @@ import { workspaceDefault, type Tx } from "@/lib/collections";
 import { db } from "@/lib/db";
 import { attachments, collections, items, users } from "@/lib/db/schema";
 import { notFound } from "@/lib/errors";
+import { isUuid } from "@/lib/uuid";
 import type { Kind } from "@/lib/item-content";
 import { canManageTrashed, resolveEffective, trashedItemsWhere, type Ctx, type Effective, type Setting } from "@/lib/permissions";
 
@@ -32,6 +33,7 @@ export async function listTrash(ctx: Ctx, now = new Date()): Promise<TrashRow[]>
 }
 
 async function loadTrashed(tx: Tx, ctx: Ctx, id: string) {
+  if (!isUuid(id)) throw notFound();
   const [r] = await tx.select().from(items).where(and(eq(items.id, id), eq(items.workspaceId, ctx.workspaceId))).for("update");
   if (!r || !canManageTrashed(ctx, r)) throw notFound(); // ไม่มี/ไม่ใช่ของถังขยะ/ไม่มีสิทธิ์ = 404 เหมือนกันหมด
   return r;

@@ -42,6 +42,8 @@ function create() {
     },
     session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 }, // หมดอายุ 7 วันถ้าไม่ใช้งาน
     advanced: {
+      // cookie ต้อง Secure เมื่อเข้าผ่าน HTTPS (production) — ไม่ปล่อยให้ขึ้นกับค่าเริ่มต้นของไลบรารี (design §14)
+      useSecureCookies: e.APP_BASE_URL.startsWith("https://"),
       database: { generateId: () => uuidv7() },
       ipAddress: { ipAddressHeaders: ["x-forwarded-for"] },
     },

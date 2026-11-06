@@ -6,6 +6,7 @@ import { loadCollection, workspaceDefault, type CollectionRow, type Tx } from "@
 import { db } from "@/lib/db";
 import { attachments, collections, itemTags, itemVersions, items, tags, users } from "@/lib/db/schema";
 import { AppError, notFound } from "@/lib/errors";
+import { isUuid } from "@/lib/uuid";
 import { prepareContent, type ItemContent, type Kind, type PreparedContent } from "@/lib/item-content";
 import { canEdit, canManage, canView, resolveEffective, visibleItemsWhere, type Ctx, type Effective, type Setting } from "@/lib/permissions";
 import { buildSearchText } from "@/lib/search/normalize";
@@ -43,6 +44,7 @@ export async function refreshSearchText(tx: Tx, itemId: string) {
 }
 
 export async function loadItem(x: Pick<Tx, "select">, ctx: Ctx, id: string): Promise<ItemRow> {
+  if (!isUuid(id)) throw notFound();
   const [r] = await x.select().from(items).where(and(eq(items.id, id), eq(items.workspaceId, ctx.workspaceId)));
   if (!r || !canView(ctx, r)) throw notFound();
   return r;
@@ -87,6 +89,7 @@ export type UpdateOpts = {
 };
 
 export async function updateItem(ctx: Ctx, id: string, input: ItemContent & { version: number }, req: Request | null, opts: UpdateOpts = {}) {
+  if (!isUuid(id)) throw notFound();
   return db().transaction(async (tx) => {
     const [locked] = await tx.select().from(items).where(and(eq(items.id, id), eq(items.workspaceId, ctx.workspaceId))).for("update");
     if (!locked || !canView(ctx, locked)) throw notFound();

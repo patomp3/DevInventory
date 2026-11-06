@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { attachments, items, users } from "@/lib/db/schema";
 import { AppError, notFound } from "@/lib/errors";
+import { isUuid } from "@/lib/uuid";
 import type { Kind } from "@/lib/item-content";
 import { canTransfer, type Ctx } from "@/lib/permissions";
 
@@ -42,7 +43,7 @@ export async function listTransferCandidates(ctx: Ctx) {
  * และผู้รับต้องเป็นคนอื่นที่ active ไม่ใช่ Admin เอง · ระดับการเข้าถึงคงเดิม (ส่วนตัวยังส่วนตัว) · บันทึก audit เสมอ
  */
 export async function transferItem(ctx: Ctx, itemId: string, newOwnerId: string, req: Request | null) {
-  if (ctx.role !== "admin") throw notFound();
+  if (ctx.role !== "admin" || !isUuid(itemId)) throw notFound();
   await db().transaction(async (tx) => {
     const [it] = await tx.select().from(items).where(and(eq(items.id, itemId), eq(items.workspaceId, ctx.workspaceId))).for("update");
     if (!it || it.deletedAt) throw notFound();

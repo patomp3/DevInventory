@@ -33,8 +33,9 @@ export async function requireAdmin(req: Request): Promise<SessionUser | Response
   return u;
 }
 
-import { AppError } from "@/lib/errors";
+import { AppError, notFound } from "@/lib/errors";
 import { toCtx } from "@/lib/auth/session";
+import { isUuid } from "@/lib/uuid";
 import type { Ctx } from "@/lib/permissions";
 
 /** route สำหรับผู้ใช้ที่ login แล้ว: ตรวจ Origin (CSRF), session, และแปลง AppError เป็น HTTP response */
@@ -47,12 +48,19 @@ export function userRoute<P = Record<string, string>>(
       const user = await getSessionUser();
       if (!user) return fail(401, "unauthenticated");
       if (user.mustChangePassword) return fail(403, "must_change_password");
-      return await fn({ req, ctx: toCtx(user), user, params: await params });
+      const p = await params;
+      if (hasBadId(p)) throw notFound(); // id ไม่ใช่ UUID = ไม่พบ (ไม่ใช่ 500)
+      return await fn({ req, ctx: toCtx(user), user, params: p });
     } catch (e) {
       if (e instanceof AppError) return fail(e.status, e.code, e.extra);
       throw e;
     }
   };
+}
+
+/** พารามิเตอร์ของ route ที่ชื่อ "id" ต้องเป็น UUID */
+function hasBadId(p: unknown): boolean {
+  return !!p && typeof p === "object" && "id" in p && !isUuid((p as { id: unknown }).id);
 }
 
 /** route สำหรับ Admin ของ workspace: ตรวจ Origin + session + บทบาท (ไม่ใช่ Admin = 404 ไม่เปิดเผยว่ามีหน้านี้) และแปลง AppError เป็น HTTP */
@@ -64,7 +72,9 @@ export function adminRoute<P = Record<string, string>>(
       const me = await requireAdmin(req);
       if (me instanceof Response) return me;
       if (me.mustChangePassword) return fail(403, "must_change_password");
-      return await fn({ req, ctx: toCtx(me), user: me, params: await params });
+      const p = await params;
+      if (hasBadId(p)) throw notFound();
+      return await fn({ req, ctx: toCtx(me), user: me, params: p });
     } catch (e) {
       if (e instanceof AppError) return fail(e.status, e.code, e.extra);
       throw e;

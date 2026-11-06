@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { collections, items, workspaces } from "@/lib/db/schema";
 import { AppError, notFound } from "@/lib/errors";
+import { isUuid } from "@/lib/uuid";
 import { canEdit, canManage, canView, resolveEffective, visibleItemsWhere, type Ctx, type Effective, type Setting } from "@/lib/permissions";
 
 export type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
@@ -17,6 +18,7 @@ export async function workspaceDefault(x: Pick<Tx, "select">, workspaceId: strin
 }
 
 export async function loadCollection(x: Pick<Tx, "select">, ctx: Ctx, id: string): Promise<CollectionRow> {
+  if (!isUuid(id)) throw notFound();
   const [c] = await x.select().from(collections).where(and(eq(collections.id, id), eq(collections.workspaceId, ctx.workspaceId)));
   if (!c || !canView(ctx, c)) throw notFound();
   return c;

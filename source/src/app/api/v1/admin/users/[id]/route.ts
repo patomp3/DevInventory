@@ -4,6 +4,7 @@ import { activeAdminCount } from "@/lib/admin-users";
 import { fail, json, requireAdmin } from "@/lib/api";
 import { audit } from "@/lib/audit";
 import { db } from "@/lib/db";
+import { isUuid } from "@/lib/uuid";
 import { session, users } from "@/lib/db/schema";
 
 const body = z.object({ status: z.enum(["active", "disabled"]).optional(), role: z.enum(["admin", "member"]).optional() })
@@ -13,6 +14,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const me = await requireAdmin(req);
   if (me instanceof Response) return me;
   const { id } = await params;
+  if (!isUuid(id)) return fail(404, "not_found");
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return fail(400, "invalid_input");
   const [target] = await db().select().from(users).where(and(eq(users.id, id), eq(users.workspaceId, me.workspaceId))).limit(1);

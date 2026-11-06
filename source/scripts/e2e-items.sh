@@ -276,6 +276,43 @@ chk quick-unauth-401 401 "$(code "$B/api/v1/search/quick?q=xyzkb")"
 # --- ถังขยะ (สัปดาห์ 7): สิทธิ์ 404, กู้คืน, Collection ถูกลบ → Inbox, ลบถาวร + ไฟล์จริง, งานรายคืน 30 วัน
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"                 # โฟลเดอร์ source/
 FILES_HOST=${FILES_HOST:-$SRC/data/files}                              # ที่เก็บไฟล์แนบของเซิร์ฟเวอร์ dev (FILES_DIR=./data/files)
+# --- id ที่ไม่ใช่ UUID = 404 ทุกทาง (ไม่ใช่ 500 จาก Postgres) — ทั้งผู้ใช้ปกติ (M) และ Admin (A)
+bad_ids() { # jar label
+  local jar=$1 who=$2 bad=0 first=""
+  while read -r method path; do
+    [ -z "$method" ] && continue
+    local c; c=$(curl -s -o /dev/null -w "%{http_code}" -b "$jar" -X "$method" -H "$O" -H "$J" -d '{"version":1,"title":"x","visibility":"private","collectionId":null,"newOwnerId":"00000000-0000-7000-8000-000000000000","status":"active"}' "$B$path")
+    if [ "$c" != "404" ]; then bad=$((bad+1)); first="$first [$method $path=$c]"; fi
+  done <<'LIST'
+GET /api/v1/items/zzz
+PUT /api/v1/items/zzz
+DELETE /api/v1/items/zzz
+PATCH /api/v1/items/zzz/move
+PATCH /api/v1/items/zzz/visibility
+POST /api/v1/items/zzz/restore
+GET /api/v1/items/zzz/versions
+GET /api/v1/items/zzz/versions/1
+POST /api/v1/items/zzz/versions/1/restore
+GET /api/v1/items/zzz/attachments
+GET /api/v1/attachments/zzz/download
+DELETE /api/v1/attachments/zzz
+DELETE /api/v1/trash/zzz
+PATCH /api/v1/collections/zzz
+DELETE /api/v1/collections/zzz
+GET /i/zzz
+GET /i/zzz/edit
+GET /i/zzz/history
+GET /c/zzz
+LIST
+  chk "bad-uuid-404-$who" "0$first" "$bad"
+}
+bad_ids M.jar member
+ADMIN_LIST_OK=1
+for ep in "PATCH /api/v1/admin/users/zzz" "POST /api/v1/admin/users/zzz/reset-password" "DELETE /api/v1/admin/invites/zzz" "POST /api/v1/admin/items/zzz/transfer"; do
+  set -- $ep; c=$(curl -s -o /dev/null -w "%{http_code}" -b A.jar -X "$1" -H "$O" -H "$J" -d '{"status":"active","newOwnerId":"00000000-0000-7000-8000-000000000000"}' "$B$2"); [ "$c" == "404" ] || { ADMIN_LIST_OK=0; echo "FAIL bad-uuid-admin $ep=$c"; }
+done
+chk bad-uuid-404-admin 1 "$ADMIN_LIST_OK"
+chk bad-uuid-collection-filter-422 422 "$(code -b M.jar "$B/api/v1/items?collection=zzz")"
 TT=$(mktemp -d); TTW=$(cygpath -m "$TT" 2>/dev/null || echo "$TT"); printf 'trash file\n' > "$TT/t.txt"
 TA=$(m -X POST $B/api/v1/items -d '{"title":"zzt alpha","visibility":"workspace_view"}' | j "['id']")
 TB=$(m -X POST $B/api/v1/items -d '{"title":"zzt private","visibility":"private"}' | j "['id']")

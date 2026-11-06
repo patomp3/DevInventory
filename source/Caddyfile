@@ -1,5 +1,10 @@
 {$APP_DOMAIN} {
 	encode zstd gzip
+	header {
+		# บังคับ HTTPS ต่อเนื่อง 1 ปี (ตัวจบ TLS คือ Caddy) — ถ้าใช้ "tls internal" ให้ดูหมายเหตุใน docs/runbook.md ก่อนเปิดใช้งานจริง
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
 	reverse_proxy app:3000
 	# ถ้าใช้เฉพาะในเครือข่ายภายใน ให้เพิ่ม "tls internal" (design.md §14)
 }
