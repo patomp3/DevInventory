@@ -1,5 +1,5 @@
 // Permission engine — design.md §4 และ §7 เป็นจุดเดียวที่ตัดสินสิทธิ์ทั้งระบบ
-import { and, eq, inArray, isNull, or, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, or, type SQL } from "drizzle-orm";
 import { items } from "@/lib/db/schema";
 
 export type Role = "admin" | "member";
@@ -67,6 +67,26 @@ export function resolveEffective(
 ): Effective {
   if (setting !== "inherit") return setting;
   return parentEffective ?? workspaceDefault;
+}
+
+/**
+ * ถังขยะ (§10.3, §4.3): กู้คืน / ลบถาวร — เจ้าของจัดการของตัวเอง, Admin จัดการได้เฉพาะรายการที่ไม่ใช่ส่วนตัว
+ * (ต่างจาก canView/canManage ตรงที่ต้อง "ถูกลบแล้ว" และไม่เปิดเนื้อหา)
+ */
+export function canManageTrashed(ctx: Ctx, r: Resource): boolean {
+  if (r.workspaceId !== ctx.workspaceId || !r.deletedAt) return false;
+  return r.ownerId === ctx.userId || (ctx.role === "admin" && r.effectiveVisibility !== "private");
+}
+
+/** SQL predicate ของรายการในถังขยะที่ผู้ใช้จัดการได้ (ใช้กับหน้าถังขยะ — คู่กับ canManageTrashed) */
+export function trashedItemsWhere(ctx: Ctx): SQL {
+  return and(
+    eq(items.workspaceId, ctx.workspaceId),
+    isNotNull(items.deletedAt),
+    ctx.role === "admin"
+      ? or(eq(items.ownerId, ctx.userId), ne(items.effectiveVisibility, "private"))
+      : eq(items.ownerId, ctx.userId),
+  )!;
 }
 
 /** SQL predicate ตัวเดียวของระบบ (§7.2) ใช้กับทุก query ที่คืนรายการ */

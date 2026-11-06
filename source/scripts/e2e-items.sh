@@ -273,5 +273,68 @@ chk quick-private-tag-admin 0 "$(sq A.jar private-tag | j "['items'].__len__()")
 chk quick-empty 0 "$(sq A.jar '' | j "['items'].__len__()")"
 chk quick-breadcrumb kbcol "$(sq A.jar xyzkb | $PY -c "import sys,json; print([x['breadcrumb'] for x in json.load(sys.stdin.buffer)['items'] if x['breadcrumb']][0])")"
 chk quick-unauth-401 401 "$(code "$B/api/v1/search/quick?q=xyzkb")"
+# --- ถังขยะ (สัปดาห์ 7): สิทธิ์ 404, กู้คืน, Collection ถูกลบ → Inbox, ลบถาวร + ไฟล์จริง, งานรายคืน 30 วัน
+SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"                 # โฟลเดอร์ source/
+FILES_HOST=${FILES_HOST:-$SRC/data/files}                              # ที่เก็บไฟล์แนบของเซิร์ฟเวอร์ dev (FILES_DIR=./data/files)
+TT=$(mktemp -d); TTW=$(cygpath -m "$TT" 2>/dev/null || echo "$TT"); printf 'trash file\n' > "$TT/t.txt"
+TA=$(m -X POST $B/api/v1/items -d '{"title":"zzt alpha","visibility":"workspace_view"}' | j "['id']")
+TB=$(m -X POST $B/api/v1/items -d '{"title":"zzt private","visibility":"private"}' | j "['id']")
+TC=$(a -X POST $B/api/v1/items -d '{"title":"zzt admin item","visibility":"workspace_view"}' | j "['id']")
+TD=$(m -X POST $B/api/v1/items -d '{"title":"zzt expired","visibility":"workspace_view"}' | j "['id']")
+curl -s -b M.jar -H "$O" -F "file=@$TTW/t.txt;filename=t.txt" "$B/api/v1/items/$TB/attachments" >/dev/null
+curl -s -b M.jar -H "$O" -F "file=@$TTW/t.txt;filename=t.txt" "$B/api/v1/items/$TD/attachments" >/dev/null
+KEY_B=$($PSQL -t -A -c "select workspace_id || '/' || storage_key from attachments where item_id='$TB' limit 1")
+KEY_D=$($PSQL -t -A -c "select workspace_id || '/' || storage_key from attachments where item_id='$TD' limit 1")
+chk trash-file-exists-before 1 "$([ -f "$FILES_HOST/$KEY_B" ] && echo 1 || echo 0)"
+chk trash-not-deleted-restore-404 404 "$(code -b M.jar -X POST $B/api/v1/items/$TA/restore -H "$O")"
+chk trash-delete-ta 200 "$(code -b M.jar -X DELETE $B/api/v1/items/$TA -H "$O")"
+chk trash-delete-tb 200 "$(code -b M.jar -X DELETE $B/api/v1/items/$TB -H "$O")"
+chk trash-delete-tc 200 "$(code -b A.jar -X DELETE $B/api/v1/items/$TC -H "$O")"
+chk trash-delete-td 200 "$(code -b M.jar -X DELETE $B/api/v1/items/$TD -H "$O")"
+ids() { curl -s -b "$1" "$B/api/v1/trash" | $PY -c "import sys,json; print(' '.join(sorted(x['title'] for x in json.load(sys.stdin.buffer)['items'])))"; }
+chk trash-list-owner "xyzkb to delete zzt alpha zzt expired zzt private" "$(ids M.jar)"
+chk trash-list-admin-no-private "xyzkb to delete zzt admin item zzt alpha zzt expired" "$(ids A.jar)"
+chk trash-days-left 30 "$(curl -s -b M.jar "$B/api/v1/trash" | j "['items'][0]['daysLeft']")"
+chk trash-unauth-401 401 "$(code "$B/api/v1/trash")"
+chk trash-detail-404-after-delete 404 "$(code -b M.jar $B/api/v1/items/$TA)"
+chk trash-search-hides 0 "$(curl -s -b M.jar "$B/api/v1/search?q=zzt" | j "['total']")"
+# สิทธิ์: ไม่ใช่ของตัวเอง/ส่วนตัวของคนอื่น = 404 (ไม่บอกว่ามีอยู่)
+chk trash-admin-restore-private-404 404 "$(code -b A.jar -X POST $B/api/v1/items/$TB/restore -H "$O")"
+chk trash-admin-purge-private-404 404 "$(code -b A.jar -X DELETE $B/api/v1/trash/$TB -H "$O")"
+chk trash-member-restore-others-404 404 "$(code -b M.jar -X POST $B/api/v1/items/$TC/restore -H "$O")"
+chk trash-member-purge-others-404 404 "$(code -b M.jar -X DELETE $B/api/v1/trash/$TC -H "$O")"
+chk trash-csrf-restore-403 403 "$(code -b M.jar -X POST $B/api/v1/items/$TA/restore)"
+chk trash-csrf-purge-403 403 "$(code -b M.jar -X DELETE $B/api/v1/trash/$TA)"
+chk trash-purge-not-trashed-404 404 "$(code -b M.jar -X DELETE $B/api/v1/trash/$S1 -H "$O")"
+# Admin กู้รายการที่ไม่ใช่ส่วนตัวของคนอื่นได้ และกลับมาค้นเจอ
+chk trash-admin-restore-nonprivate 200 "$(code -b A.jar -X POST $B/api/v1/items/$TA/restore -H "$O")"
+chk trash-restored-visible 200 "$(code -b M.jar $B/api/v1/items/$TA)"
+chk trash-restored-search 1 "$(curl -s -b M.jar "$B/api/v1/search?q=zzt+alpha" | j "['total']")"
+chk trash-restored-audit 1 "$($PSQL -t -A -c "select (count(*) > 0)::int from audit_logs where action='item.restored' and target_id='$TA'")"
+# ลบถาวร: ไฟล์จริงหาย แถวไฟล์แนบหาย audit ครบ
+chk trash-owner-purge-private 200 "$(code -b M.jar -X DELETE $B/api/v1/trash/$TB -H "$O")"
+chk trash-purged-gone 0 "$($PSQL -t -A -c "select count(*) from items where id='$TB'")"
+chk trash-purged-attachment-rows 0 "$($PSQL -t -A -c "select count(*) from attachments where item_id='$TB'")"
+chk trash-purged-file-removed 0 "$([ -f "$FILES_HOST/$KEY_B" ] && echo 1 || echo 0)"
+chk trash-purged-audit 1 "$($PSQL -t -A -c "select (count(*) = 1)::int from audit_logs where action='item.purged' and target_id='$TB' and after->>'reason'='manual'")"
+chk trash-purged-twice-404 404 "$(code -b M.jar -X DELETE $B/api/v1/trash/$TB -H "$O")"
+# Collection เดิมถูกลบไปแล้ว → กู้แล้วกลับ Inbox (inherit → ค่า default ของ workspace)
+KT=$(a -X POST $B/api/v1/collections -d '{"name":"zzt-col","visibility":"workspace_edit"}' | j "['id']")
+TE=$(a -X POST $B/api/v1/items -d "{\"title\":\"zzt in col\",\"collectionId\":\"$KT\"}" | j "['id']")
+code -b A.jar -X DELETE $B/api/v1/items/$TE -H "$O" >/dev/null
+chk trash-collection-delete-200 200 "$(code -b A.jar -X DELETE $B/api/v1/collections/$KT -H "$O")"
+chk trash-restore-moved-to-inbox True "$(a -X POST $B/api/v1/items/$TE/restore | j "['movedToInbox']")"
+chk trash-restore-inbox-collection None "$(a $B/api/v1/items/$TE | j "['item']['collectionId']")"
+chk trash-restore-inbox-visibility workspace_view "$(a $B/api/v1/items/$TE | j "['item']['effectiveVisibility']")"
+# งานรายคืน: เกิน 30 วันถูกลบ (พร้อมไฟล์) ที่ยังไม่เกินอยู่ครบ
+$PSQL -c "update items set deleted_at = now() - interval '31 days' where id='$TD'" >/dev/null
+code -b M.jar -X DELETE $B/api/v1/items/$TA -H "$O" >/dev/null     # TA เพิ่งลบ (ไม่เกิน 30 วัน)
+(cd "$SRC" && npm run job:purge 2>&1 | grep -E "^purged") > "$TT/purge.out"
+chk trash-job-ran 1 "$(grep -c '^purged' "$TT/purge.out")"
+chk trash-job-purged-expired 0 "$($PSQL -t -A -c "select count(*) from items where id='$TD'")"
+chk trash-job-file-removed 0 "$([ -f "$FILES_HOST/$KEY_D" ] && echo 1 || echo 0)"
+chk trash-job-keeps-recent 1 "$($PSQL -t -A -c "select count(*) from items where id='$TA' and deleted_at is not null")"
+chk trash-job-audit-retention 1 "$($PSQL -t -A -c "select (count(*) = 1)::int from audit_logs where action='item.purged' and target_id='$TD' and actor_id is null and after->>'reason'='retention'")"
+rm -rf "$TT"
 # ผลรวม
 echo "passed=$pass failed=$failn"

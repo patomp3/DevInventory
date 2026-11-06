@@ -16,6 +16,7 @@
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
     "doctor": "tsx --env-file-if-exists=.env scripts/doctor.ts",
+    "job:purge": "tsx --env-file-if-exists=.env scripts/purge-trash.ts",
     "poc:search": "tsx --env-file-if-exists=.env scripts/poc-thai-search.ts"
   },
   "dependencies": {

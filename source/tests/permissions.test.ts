@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  canEdit, canManage, canTransfer, canView, resolveEffective,
+  canEdit, canManage, canManageTrashed, canTransfer, canView, resolveEffective,
   type Ctx, type Effective, type Resource,
 } from "@/lib/permissions";
 
@@ -78,4 +78,22 @@ describe("resolveEffective (§4.4)", () => {
   it("inherit ที่ไม่มี Collection ใช้ default ของ Workspace", () => {
     expect(resolveEffective("inherit", null, "workspace_view")).toBe("workspace_view");
   });
+});
+
+describe("ถังขยะ canManageTrashed (§10.3)", () => {
+  const gone = (v: Effective, extra: Partial<Resource> = {}) => item(v, { deletedAt: new Date(), ...extra });
+  it("เจ้าของจัดการของตัวเองได้ทุกระดับ แม้เป็น private", () => {
+    for (const v of ["private", "workspace_view", "workspace_edit"] as const) expect(canManageTrashed(owner, gone(v))).toBe(true);
+  });
+  it("Admin จัดการได้เฉพาะรายการที่ไม่ใช่ private", () => {
+    expect(canManageTrashed(admin, gone("workspace_view"))).toBe(true);
+    expect(canManageTrashed(admin, gone("workspace_edit"))).toBe(true);
+    expect(canManageTrashed(admin, gone("private"))).toBe(false);
+  });
+  it("Member คนอื่นจัดการไม่ได้ แม้รายการเปิดให้ทีมแก้ไข", () => {
+    expect(canManageTrashed(member, gone("workspace_edit"))).toBe(false);
+    expect(canManageTrashed(member, gone("workspace_view"))).toBe(false);
+  });
+  it("รายการที่ยังไม่ถูกลบไม่ใช่ของถังขยะ", () => expect(canManageTrashed(owner, item("workspace_view"))).toBe(false));
+  it("ข้าม workspace ไม่ได้แม้เป็น admin", () => expect(canManageTrashed(outsider, gone("workspace_view"))).toBe(false));
 });

@@ -35,6 +35,7 @@ export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; 
           {item("/inbox", "Inbox")}
           {item("/mine", "ของฉัน")}
           {item("/search", "ค้นหา")}
+          {item("/trash", "ถังขยะ")}
           {user.role === "admin" && (
             <>
               <p className="px-3 pb-1 pt-4 text-[13px] font-semibold text-muted">ผู้ดูแลระบบ</p>

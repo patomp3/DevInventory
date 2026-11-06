@@ -63,3 +63,22 @@ export function CopyBox({ value }: { value: string }) {
     </div>
   );
 }
+
+/** Dialog ยืนยัน (ui-design: ชื่อ + ประโยคบอกผลที่ตามมา + ยกเลิก / ปุ่มยืนยัน; ปุ่มทำลายใช้สีแดง) */
+export function ConfirmDialog({ title, children, confirmLabel, danger = false, busy = false, error, onConfirm, onClose }: {
+  title: string; children: ReactNode; confirmLabel: string; danger?: boolean; busy?: boolean; error?: string;
+  onConfirm: () => void; onClose: () => void;
+}) {
+  return (
+    <Dialog title={title} onClose={() => !busy && onClose()} width={480}>
+      <div className="space-y-4">
+        {error && <Alert>{error}</Alert>}
+        <div className="space-y-2 text-sm text-text-2">{children}</div>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={busy}>ยกเลิก</Button>
+          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} disabled={busy}>{confirmLabel}</Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}

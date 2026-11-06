@@ -51,7 +51,19 @@ services:
       - app
     restart: unless-stopped
 
-  # backup (pg_dump + restic) จะเพิ่มในสัปดาห์ 7 ตามแผน §17
+  # งานลบถาวรรายการในถังขยะที่เกิน 30 วัน (design.md §10.3) วันละครั้งนับจากเวลาที่ container เริ่ม
+  purge:
+    build: { context: ., target: build }
+    command: sh -c "while true; do npm run job:purge; sleep 86400; done"
+    env_file: .env
+    volumes:
+      - files:/data/files
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # backup (pg_dump + restic): ดู scripts/backup.sh และ docs/runbook.md
 
 volumes:
   files:
