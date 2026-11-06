@@ -32,6 +32,7 @@
     "@lezer/highlight": "^1.2.5",
     "@shikijs/rehype": "^4.6.0",
     "better-auth": "^1.7.17",
+    "diff": "^9.0.0",
     "drizzle-orm": "^0.45.4",
     "next": "^15.5.0",
     "pg": "^8.13.0",

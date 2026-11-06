@@ -18,6 +18,7 @@ export function ItemActions({ id, canEdit, canManage, visibility, effective, has
   const close = () => { setDlg(null); setErr(""); };
   return (
     <div className="flex flex-wrap gap-2">
+      <Link href={`/i/${id}/history`} className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 text-sm text-text-2 hover:bg-surface-hover">ประวัติ</Link>
       {canEdit && <Link href={`/i/${id}/edit`} className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:brightness-110">แก้ไข</Link>}
       {canManage && (
         <>

@@ -1,11 +1,12 @@
 "use client";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AttachmentPanel, uploadFile, type AttachmentView } from "@/components/AttachmentPanel";
 import { CodeEditor } from "@/components/CodeEditor";
+import { ConflictDialog, type ConflictCurrent } from "@/components/ConflictDialog";
 import { api } from "@/components/PermissionDialog";
 import { TagInput } from "@/components/TagInput";
-import { Alert, Button, Dialog, Field } from "@/components/ui";
+import { Alert, Button, Field } from "@/components/ui";
 import { KIND_HINT, KIND_LABEL, KINDS, type Kind } from "@/lib/item-content";
 import type { Setting } from "@/lib/permissions";
 import { VIS_LABEL } from "@/lib/visibility-labels";
@@ -27,7 +28,7 @@ const BODY_PLACEHOLDER = [
 ].join("\n");
 
 /** Editor เดียวสำหรับทุกรายการ (D22): ชื่อ, คำอธิบาย, ป้าย (เลือกได้หลายป้าย), เนื้อหา Markdown, Collection/สิทธิ์/Tag */
-export function ItemEditor({ initial, targets }: { initial: EditorInitial; targets: Target[] }) {
+export function ItemEditor({ initial, targets, attachments = [] }: { initial: EditorInitial; targets: Target[]; attachments?: AttachmentView[] }) {
   const router = useRouter();
   const editing = !!initial.id;
   const [f, setF] = useState({ title: initial.title, summary: initial.summary, body: initial.body, collectionId: initial.collectionId });
@@ -35,10 +36,12 @@ export function ItemEditor({ initial, targets }: { initial: EditorInitial; targe
   const [tags, setTags] = useState<string[]>(initial.tags);
   const [vis, setVis] = useState<Setting>("inherit");
   const [version, setVersion] = useState(initial.version);
+  const [files, setFiles] = useState<AttachmentView[]>(attachments);
+  const [pending, setPending] = useState<File[]>([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const [conflict, setConflict] = useState<{ version: number; title: string } | null>(null);
+  const [conflict, setConflict] = useState<ConflictCurrent | null>(null);
   const saving = useRef(false);
 
   const touch = () => setDirty(true);
@@ -59,13 +62,25 @@ export function ItemEditor({ initial, targets }: { initial: EditorInitial; targe
     saving.current = false;
     if (r.ok) {
       setDirty(false);
-      router.push(`/i/${editing ? initial.id : r.data.id}`); router.refresh();
+      const id = editing ? initial.id! : (r.data.id as string);
+      // รายการใหม่: อัปโหลดไฟล์ที่เลือกไว้หลังสร้างรายการสำเร็จ
+      const failed: string[] = [];
+      for (const f of pending) {
+        const u = await uploadFile(id, f);
+        if (!u.ok) failed.push(u.error);
+      }
+      if (failed.length) {
+        alert(`สร้างรายการแล้ว แต่แนบไฟล์ไม่สำเร็จ ${failed.length} ไฟล์\n${failed.join("\n")}\n\nจะพาไปหน้าแก้ไขเพื่อแนบใหม่`);
+        router.push(`/i/${id}/edit`); router.refresh();
+        return;
+      }
+      router.push(`/i/${id}`); router.refresh();
       return;
     }
     if (r.status === 409) setConflict(r.data.current);
     else setErr(r.error!);
     setBusy(false);
-  }, [version, f, kinds, tags, editing, initial.id, vis, router]);
+  }, [version, f, kinds, tags, editing, initial.id, vis, router, pending]);
 
   // Ctrl+S / ⌘S บันทึก
   useEffect(() => {
@@ -159,21 +174,20 @@ export function ItemEditor({ initial, targets }: { initial: EditorInitial; targe
           )}
           <TagInput value={tags} onChange={(v) => { setTags(v); touch(); }} />
           {editing && <p className="text-xs text-muted">ย้าย Collection และเปลี่ยนสิทธิ์ได้จากหน้ารายละเอียด</p>}
-          <p className="text-xs text-muted">ไฟล์แนบจะเพิ่มในขั้นถัดไป (อยู่ใต้รายการนี้)</p>
+          <AttachmentPanel itemId={initial.id ?? null} files={files} onFiles={setFiles} pending={pending} onPending={(p) => { setPending(p); touch(); }} />
         </aside>
       </div>
 
       {conflict && (
-        <Dialog title="มีคนแก้ไขรายการนี้ไปก่อนแล้ว" onClose={() => setConflict(null)} width={480}>
-          <div className="space-y-4">
-            <p className="text-sm text-text-2">รายการนี้ถูกบันทึกเป็นเวอร์ชัน {conflict.version} ระหว่างที่คุณแก้ไข</p>
-            <p className="text-xs text-muted">เลือก “บันทึกทับ” เพื่อใช้เนื้อหาของคุณ (เวอร์ชันของอีกคนยังอยู่ในประวัติ) หรือเปิดเวอร์ชันล่าสุดในแท็บใหม่เพื่อคัดลอกส่วนที่ต้องการก่อน</p>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Link href={`/i/${initial.id}`} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 text-sm text-text-2 hover:bg-surface-hover">เปิดเวอร์ชันล่าสุด</Link>
-              <Button type="button" variant="danger" onClick={() => { setVersion(conflict.version); save(conflict.version); }}>บันทึกทับ</Button>
-            </div>
-          </div>
-        </Dialog>
+        <ConflictDialog current={conflict} mine={{ title: f.title, summary: f.summary || null, body: f.body || null, kinds, tags }}
+          onClose={() => setConflict(null)}
+          onUseLatest={() => {
+            // ทางที่ 1: โหลดเวอร์ชันล่าสุดลงฟอร์ม แล้วแก้ต่อจากนั้น
+            setF((x) => ({ ...x, title: conflict.title, summary: conflict.summary ?? "", body: conflict.body ?? "" }));
+            setKinds(conflict.kinds.length ? conflict.kinds : ["note"]); setTags(conflict.tags);
+            setVersion(conflict.version); setConflict(null); setErr("");
+          }}
+          onOverwrite={() => { setVersion(conflict.version); save(conflict.version); }} />
       )}
     </form>
   );

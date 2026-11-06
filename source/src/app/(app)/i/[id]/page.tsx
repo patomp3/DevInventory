@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { ItemActions } from "./ItemActions";
+import { AttachmentList } from "@/components/AttachmentList";
 import { KindChips } from "@/components/KindChips";
 import { MarkdownView } from "@/components/MarkdownView";
 import { TagChips } from "@/components/TagChips";
 import { VisibilityBadge } from "@/components/VisibilityBadge";
 import { orNotFound, requireCtx } from "@/lib/auth/session";
+import { listAttachments } from "@/lib/attachments";
 import { listWritableCollections } from "@/lib/collections";
 import { getItemDetail } from "@/lib/items";
 
@@ -13,7 +15,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const { ctx } = await requireCtx();
   const item = await orNotFound(getItemDetail(ctx, id));
-  const targets = item.canManage ? await listWritableCollections(ctx) : [];
+  const [targets, files] = await Promise.all([item.canManage ? listWritableCollections(ctx) : Promise.resolve([]), listAttachments(ctx, id)]);
   return (
     <article>
       <nav aria-label="breadcrumb" className="mb-2 text-xs text-muted">
@@ -36,6 +38,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       {item.body
         ? <div className="mt-6 rounded-xl border border-line bg-sidebar p-5"><MarkdownView source={item.body} /></div>
         : <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">ยังไม่มีเนื้อหา</p>}
+      <AttachmentList items={files} />
     </article>
   );
 }

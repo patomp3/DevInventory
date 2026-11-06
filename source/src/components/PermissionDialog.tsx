@@ -53,6 +53,8 @@ export const API_ERR: Record<string, string> = {
   no_parent_to_inherit: "รายการใน Inbox ต้องตั้งสิทธิ์เอง", invalid_url: "URL ต้องขึ้นต้นด้วย http:// หรือ https://", title_required: "กรุณาใส่ชื่อเรื่อง",
   validation: "ข้อมูลไม่ถูกต้อง", kind_required: "เลือกป้ายอย่างน้อย 1 ป้าย", invalid_kind: "ป้ายไม่ถูกต้อง",
   body_too_large: "เนื้อหายาวเกินกำหนด (ไม่เกิน 500,000 ตัวอักษร)", too_many_tags: "ใส่ tag ได้ไม่เกิน 20 รายการ",
+  already_current: "นี่คือเวอร์ชันปัจจุบันอยู่แล้ว", version_conflict: "มีคนแก้ไขรายการนี้ไปก่อนแล้ว",
+  file_too_large: "ไฟล์ใหญ่เกิน 50 MB", file_empty: "ไฟล์ว่างเปล่า", too_many_attachments: "แนบได้ไม่เกิน 50 ไฟล์ต่อรายการ", invalid_form: "ส่งไฟล์ไม่สำเร็จ",
 };
 
 export async function api(url: string, method: string, body?: unknown) {

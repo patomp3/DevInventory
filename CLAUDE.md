@@ -23,8 +23,8 @@ Next.js 15 App Router (TypeScript, webpack) · Drizzle ORM + `pg` · PostgreSQL 
 | 2 | Better Auth, เชิญด้วยอีเมล, Admin › ผู้ใช้, audit log | เสร็จ |
 | 3 | Collection tree + สืบทอดสิทธิ์, Note/Link CRUD, versions, 409, UI หลัก | เสร็จ |
 | 4 | Editor Markdown + code fence (Shiki, Copy), ป้าย kinds (D22), tag | เสร็จ (ตรวจในเบราว์เซอร์แล้ว: สร้าง/แก้ Note หลายป้าย, code fence highlight + Copy, รายการที่แปลงจากข้อมูลเก่า) |
-| 5 | ไฟล์แนบ, หน้า History + diff, dialog 409 | **ถัดไป** |
-| 6 | ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet | |
+| 5 | ไฟล์แนบใต้ Note, หน้า History + diff + กู้เวอร์ชัน, dialog 409 แบบ 3 ทาง | เสร็จ (e2e 113/113 + ตรวจในเบราว์เซอร์: อัปโหลดรูปชื่อไทย, dialog 409, History ของ snapshot เก่า) |
+| 6 | ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet | **ถัดไป** |
 | 7 | ถังขยะ, Admin › รายการส่วนตัว/audit log/ตั้งค่า, backup | |
 | 8 | ทดสอบตาม DoD, แก้บั๊ก, เอกสาร, deploy | |
 
@@ -39,13 +39,15 @@ src/lib/collections.ts tree + CRUD + recomputeSubtree (สืบทอด effect
 src/lib/items.ts       รายการ: create/update(409)/move/visibility/delete, listItems(type/tag), getItemDetail(codeBlocks, tags)
 src/lib/item-content.ts pure: KINDS/KIND_LABEL, normalizeKinds, prepareContent, normalizeTag(s), LIMITS (body ≤ 500,000 ตัวอักษร, tag ≤ 20)
 src/lib/item-schema.ts zod body ของ POST/PUT items  ·  src/lib/tags.ts  replaceItemTags, tagsForItems, listTags (ผ่าน visibleItemsWhere)
+src/lib/attachments.ts ไฟล์แนบ: upload/list/download/delete (สิทธิ์ผ่านรายการแม่ + soft delete) · src/lib/attachment-meta.ts pure: sniffMime (magic bytes), cleanFilename, contentDisposition, ขีดจำกัด
+src/lib/versions.ts    listVersions / getVersionWithPrev / restoreVersion (กู้ = เวอร์ชันใหม่ ไม่ merge) · src/lib/item-history.ts pure: snapshotToView (รองรับ snapshot เก่า+ใหม่), sideBySide (diff), changedFields
 src/lib/highlight.ts   Shiki highlighter ตัวเดียว (JS regex engine, ธีมเองตาม ui-design §3.1) ใช้ผ่าน @shikijs/rehype ใน MarkdownView
 src/lib/auth/          Better Auth config (lazy), session helper, password policy
 src/lib/api.ts         userRoute()/requireAdmin() — ตรวจ Origin(CSRF) + session + แปลง AppError → HTTP
 src/lib/audit.ts       เขียน audit_logs   ·  src/lib/errors.ts  AppError, notFound
 src/lib/db/schema.ts   Drizzle schema (ต้องตรงกับ drizzle/*.sql)
-src/app/api/v1/…       REST: auth, admin/{users,invites}, collections, items, tags
-src/components/        MarkdownView (server, MarkdownAsync: sanitize → Shiki) + CodePre (Copy), CodeEditor (CodeMirror 6 โหมด Markdown), TagInput, KindChips, ItemEditor (Editor เดียว)
+src/app/api/v1/…       REST: auth, admin/{users,invites}, collections, items (+ /attachments, /versions, /versions/:v/restore), attachments/:id (+ /download), tags
+src/components/        MarkdownView (server, MarkdownAsync: sanitize → Shiki) + CodePre (Copy), CodeEditor (CodeMirror 6 โหมด Markdown), TagInput, KindChips, ItemEditor (Editor เดียว), AttachmentPanel/AttachmentList, DiffView, ConflictDialog (409 แบบ 3 ทาง)
 src/app/(app)/…        หน้าหลังล็อกอิน (layout ตรวจ session + sidebar tree)
 drizzle/*.sql          migration แบบ SQL ล้วน รันด้วย scripts/migrate.ts ตามชื่อไฟล์
 scripts/               migrate, seed, doctor, poc-thai-search, e2e-auth.sh, e2e-items.sh
@@ -92,9 +94,9 @@ npm run dev                      # http://localhost:3000
 
 ## ทดสอบ
 
-- `npm test` (Vitest, 54 เคส: permission matrix, search, password policy, item-content (ป้าย/tag)) · `npm run typecheck` · `npm run build`
+- `npm test` (Vitest, 80 เคส: permission matrix, search, password policy, item-content (ป้าย/tag), attachment-meta, item-history (snapshot/diff)) · `npm run typecheck` · `npm run build`
 - e2e (ต้องมีเซิร์ฟเวอร์รันอยู่ + DB ที่ seed แล้ว + `psql`; เขียนเป็น bash — บน Windows ใช้ Git Bash/WSL): `scripts/e2e-auth.sh` (login lockout, เชิญ, รีเซ็ตรหัส, ปิดบัญชี) และ `scripts/e2e-items.sh` (สิทธิ์/สืบทอด/409/ความลึก + ป้าย/tag/Markdown) ตั้งตัวแปร env `B`, `PSQL`, `ADMIN_EMAIL`, `ADMIN_PW`, `MEMBER_EMAIL`, `PY` ให้ตรงกับเครื่อง — บนเครื่องนี้: `PY=python` (python3 เป็นแค่ stub ของ Store), `PSQL="docker exec -i source-db-1 psql -U inventory inventory"`, `B=http://localhost:3100`
-- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-05 หลัง D22: 56/56 ผ่าน) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน
+- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-06 หลังสัปดาห์ 5: 113/113 ผ่าน) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน · `curl -F file=@…` บน Windows อ่าน path แบบ `/tmp/…` ไม่ได้ ต้องใช้ `cygpath -m` (สคริปต์ทำให้แล้ว)
 - เพิ่มเทสต์ทุกครั้งที่แตะ permission engine; ทุก endpoint ใหม่ต้องมีเคส "ไม่มีสิทธิ์ → 404" และ "ข้าม workspace"
 - ยังไม่มีเทส UI/Playwright (อยู่ในแผนสัปดาห์ 8) — หน้า Editor/Detail/หน้าแรก ตรวจในเบราว์เซอร์แล้ว แต่หน้า Login/Admin/Collection ของสัปดาห์ 2–3 ยังไม่ได้ไล่ดูละเอียดเทียบ ui-design
 - พอร์ต 3000 บนเครื่องนี้มีบริการอื่น (Gotenberg) จับอยู่ — `.claude/launch.json` รัน dev ที่ **3100**
@@ -111,10 +113,21 @@ npm run dev                      # http://localhost:3000
 - Shiki คืน HTML ที่มี `style` inline และ CodeMirror inject `<style>` — ตอนใส่ CSP strict ต้องอนุญาต `style-src 'unsafe-inline'` หรือใช้ nonce/class
 - หน้า `/tags/[slug]` เป็นลิสต์ชั่วคราว จะถูกแทนด้วยหน้าค้นหา `tag:` ในสัปดาห์ 6 · ตัวกรอง `lang:` ในสัปดาห์ 6 ให้หาจาก code fence ใน body (`` ```bash ``)
 
+## สัปดาห์ 5 — ไฟล์แนบ / History / 409 — ข้อควรรู้
+
+- **ไฟล์แนบ** (design §9, D22: อยู่ใต้ Note ไม่มีประเภท File): เก็บที่ `{FILES_DIR}/{workspace_id}/{uuid}` (ไม่มีชื่อจริงใน path) · dev บน Windows ตั้ง `FILES_DIR=./data/files` ใน `.env` (ถ้าใช้ `/data/files` จะกลายเป็น `D:\data\files`) และ `data/` ถูก ignore · ≤ 50 MB/ไฟล์, ≤ 50 ไฟล์/รายการ · อัปโหลดอ่านทั้งไฟล์เข้าหน่วยความจำ (พอสำหรับทีมเล็ก; ถ้าต้องรองรับไฟล์ใหญ่ขึ้นให้เปลี่ยนเป็น stream)
+- **MIME ตรวจจากเนื้อไฟล์จริง** (`sniffMime`): รู้จัก png/jpeg/gif/webp/pdf/zip/gzip นอกนั้น `application/octet-stream` · แสดง inline เฉพาะรูปแรสเตอร์ (**ไม่รวม SVG**) ที่เหลือบังคับ `Content-Disposition: attachment` · header: `nosniff`, `Cache-Control: private, no-store`, CSP `default-src 'none'; sandbox`
+- ไฟล์แนบไม่มีสิทธิ์ของตัวเอง: ทุก endpoint ตรวจผ่านรายการแม่ (`loadItem`/`canEdit`) ไม่มีสิทธิ์/ไม่มี/ถูกลบ = 404 · ลบ = soft delete (`deleted_at`) ไฟล์จริงลบตอน purge ถังขยะ (สัปดาห์ 7 — **ต้องลบไฟล์บนดิสก์ด้วย**) · อัปโหลด/ลบ/ผ่าน `refreshSearchText` อัปเดต `search_text` (ชื่อไฟล์ค้นเจอ) และเขียน audit `attachment.uploaded|deleted`
+- รายการใหม่: Editor เก็บไฟล์ไว้ก่อนแล้วอัปโหลดหลังสร้างรายการสำเร็จ (ถ้าบางไฟล์ล้มเหลวจะพาไปหน้าแก้ไข) · ปุ่ม "ลิงก์" คัดลอก Markdown (`![ชื่อ](/api/v1/attachments/:id/download)` สำหรับรูป) ไปวางในเนื้อหา
+- **History**: `GET /items/:id/versions[/:v]`, `POST …/versions/:v/restore` (body `{version}` = เวอร์ชันปัจจุบันที่ผู้ใช้เห็น → optimistic locking) · กู้ = เวอร์ชันใหม่เสมอ **ไม่ merge** กับเวอร์ชันล่าสุดแม้เป็นคนเดิมภายใน 5 นาที (`updateItem(..., { noMerge: true })`) · สิทธิ์ตรวจก่อนเงื่อนไขอื่น (ดูได้แต่แก้ไม่ได้ = 403 ก่อน 422 `already_current`) · กู้เฉพาะ title/summary/body/kinds/tags (ไม่แตะสิทธิ์/Collection/ไฟล์แนบ)
+- snapshot ก่อน D22 ถูกแปลงตอนอ่านด้วย `snapshotToView` ให้ได้ Markdown แบบเดียวกับ migration 0003 (ไม่แก้ข้อมูลเดิมใน DB)
+- **409**: payload `current` = `{version,title,summary,body,kinds,tags,editedBy,editedAt}` · `ConflictDialog` (กว้าง 720 — สเปก ui-design ระบุ 560 แต่ diff แบบ 2 คอลัมน์แคบเกินไป) 3 ทาง: ใช้ของล่าสุดแล้วแก้ใหม่ / บันทึกทับ / คัดลอกของฉันเก็บไว้ก่อน
+- ยังไม่มี "กำลังแก้ไขโดย …" (heartbeat, design §10.2 ท้ายหัวข้อ — best-effort) และการรวมเวอร์ชันยังไม่มีนโยบายจำกัดจำนวน (เก็บทุกเวอร์ชัน)
+
 ## ช่องว่างที่รู้อยู่แล้ว (ทำตอนถึงสัปดาห์ที่เกี่ยวข้อง)
 
 - dialog ย้ายรายการเตือนแบบรวม ๆ ยังไม่แยกกรณี "สิทธิ์เปิดกว้างขึ้น" (design §4.4.4)
-- ลบรายการ = soft delete เท่านั้น ยังไม่มีหน้าถังขยะ/กู้คืน (สัปดาห์ 7); ยังไม่มีหน้า History และ dialog 409 แบบเต็ม (สัปดาห์ 5 — ตอนนี้เป็น dialog ง่าย ๆ ใน `ItemEditor`)
+- ลบรายการ = soft delete เท่านั้น ยังไม่มีหน้าถังขยะ/กู้คืน (สัปดาห์ 7)
 - ยังไม่มี endpoint `/me`, `/auth/methods`, `/trash`, `/search`, admin `private-items`/`audit-logs`/`settings`/transfer
 - ตรรกะ `canTransfer` มีและทดสอบแล้ว แต่ยังไม่มี endpoint/หน้าจอ (TransferDialog ออกแบบไว้แล้วในแคนวาส)
 - แอปตั้ง `X-Frame-Options` ฯลฯ เบื้องต้นใน `next.config.ts`; CSP แบบ strict ยังไม่ได้ใส่

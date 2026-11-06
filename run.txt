@@ -99,7 +99,7 @@ C) ทดสอบ
 
 Unit test
    npm test
-   อธิบาย: รัน Vitest (ตอนนี้ 54 เคส: สิทธิ์, การค้นหา, รหัสผ่าน, ป้าย/tag) ไม่ต้องใช้ฐานข้อมูล
+   อธิบาย: รัน Vitest (ตอนนี้ 80 เคส: สิทธิ์, การค้นหา, รหัสผ่าน, ป้าย/tag, ไฟล์แนบ, ประวัติเวอร์ชัน) ไม่ต้องใช้ฐานข้อมูล
 
 Build แบบ production
    npm run build
@@ -112,7 +112,7 @@ Build แบบ production
    ADMIN_EMAIL=<อีเมล admin> ADMIN_PW=<รหัส admin> MEMBER_EMAIL=<อีเมลที่ยังไม่เคยใช้> \
    bash scripts/e2e-items.sh
 
-   อธิบาย: ยิง HTTP จริงตรวจสิทธิ์ การสืบทอด 409 ป้าย/tag/Markdown (56 เช็ก) จบด้วย passed=… failed=…
+   อธิบาย: ยิง HTTP จริงตรวจสิทธิ์ การสืบทอด 409 ป้าย/tag/Markdown ไฟล์แนบ และประวัติเวอร์ชัน (113 เช็ก) จบด้วย passed=… failed=…
    - PY=python เพราะ python3 บนเครื่องนี้เป็นแค่ทางลัดไป Microsoft Store
    - PSQL ใช้ psql ใน container เพราะเครื่องนี้ไม่ได้ติดตั้ง psql
    - สคริปต์จะเชิญ MEMBER_EMAIL เป็นสมาชิกใหม่ และนับจำนวนแบบ workspace ว่าง

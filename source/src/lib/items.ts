@@ -1,10 +1,10 @@
 // รายการ (Note ชนิดเดียว + ป้าย kinds, D22) — สิทธิ์, การสืบทอด, optimistic locking, ประวัติเวอร์ชัน (design.md §6, §10)
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
 import { audit } from "@/lib/audit";
 import { loadCollection, workspaceDefault, type CollectionRow, type Tx } from "@/lib/collections";
 import { db } from "@/lib/db";
-import { collections, itemTags, itemVersions, items, tags, users } from "@/lib/db/schema";
+import { attachments, collections, itemTags, itemVersions, items, tags, users } from "@/lib/db/schema";
 import { AppError, notFound } from "@/lib/errors";
 import { prepareContent, type ItemContent, type Kind, type PreparedContent } from "@/lib/item-content";
 import { canEdit, canManage, canView, resolveEffective, visibleItemsWhere, type Ctx, type Effective, type Setting } from "@/lib/permissions";
@@ -18,10 +18,29 @@ const MERGE_WINDOW_MS = 5 * 60 * 1000;
 /** snapshot ใน item_versions (§6.2): title, summary, body, kinds, tags (snapshot ก่อน 0003 มี url/scriptMeta/codeBlocks แทน kinds) */
 const snapshot = (p: PreparedContent) => ({ title: p.title, summary: p.summary, body: p.body, kinds: p.kinds, tags: p.tags.map((t) => t.name) });
 
-const searchText = (p: PreparedContent) => buildSearchText({
-  title: p.title, summary: p.summary, body: p.body,
-  tagNames: p.tags.flatMap((t) => (t.name.toLowerCase() === t.slug ? [t.slug] : [t.name, t.slug])),
+const tagTerms = (list: { name: string; slug: string }[]) => list.flatMap((t) => (t.name.toLowerCase() === t.slug ? [t.slug] : [t.name, t.slug]));
+
+const searchText = (p: PreparedContent, attachmentNames: string[] = []) => buildSearchText({
+  title: p.title, summary: p.summary, body: p.body, attachmentNames, tagNames: tagTerms(p.tags),
 });
+
+async function attachmentNamesOf(tx: Pick<Tx, "select">, itemId: string): Promise<string[]> {
+  const rows = await tx.select({ n: attachments.originalName }).from(attachments)
+    .where(and(eq(attachments.itemId, itemId), isNull(attachments.deletedAt))).orderBy(asc(attachments.createdAt));
+  return rows.map((r) => r.n);
+}
+
+/** สร้าง search_text ใหม่เมื่อไฟล์แนบเปลี่ยน (ไม่แตะ version/updated_at) — เรียกใน transaction เดียวกับการเปลี่ยนไฟล์แนบ */
+export async function refreshSearchText(tx: Tx, itemId: string) {
+  const [r] = await tx.select().from(items).where(eq(items.id, itemId));
+  if (!r) return;
+  const tagMap = await tagsForItems(tx, [itemId]);
+  const text = buildSearchText({
+    title: r.title, summary: r.summary, body: r.body,
+    attachmentNames: await attachmentNamesOf(tx, itemId), tagNames: tagTerms(tagMap.get(itemId) ?? []),
+  });
+  await tx.update(items).set({ searchText: text }).where(eq(items.id, itemId));
+}
 
 export async function loadItem(x: Pick<Tx, "select">, ctx: Ctx, id: string): Promise<ItemRow> {
   const [r] = await x.select().from(items).where(and(eq(items.id, id), eq(items.workspaceId, ctx.workspaceId)));
@@ -60,30 +79,47 @@ export async function createItem(
   });
 }
 
-export async function updateItem(ctx: Ctx, id: string, input: ItemContent & { version: number }, req: Request | null) {
+export type UpdateOpts = {
+  /** ไม่รวมกับเวอร์ชันล่าสุดแม้เป็นคนเดิมภายใน 5 นาที (ใช้ตอนกู้เวอร์ชัน: ต้องเกิดเวอร์ชันใหม่เสมอ) */
+  noMerge?: boolean;
+  action?: string;
+  auditExtra?: Record<string, unknown>;
+};
+
+export async function updateItem(ctx: Ctx, id: string, input: ItemContent & { version: number }, req: Request | null, opts: UpdateOpts = {}) {
   return db().transaction(async (tx) => {
     const [locked] = await tx.select().from(items).where(and(eq(items.id, id), eq(items.workspaceId, ctx.workspaceId))).for("update");
     if (!locked || !canView(ctx, locked)) throw notFound();
     if (!canEdit(ctx, locked)) throw new AppError(403, "forbidden");
     // optimistic locking: ถ้ามีคนแก้ไปก่อน ส่ง 409 พร้อมสถานะปัจจุบันให้ UI แสดง dialog (§1.1)
-    if (locked.version !== input.version) throw new AppError(409, "version_conflict", { current: { version: locked.version, title: locked.title, summary: locked.summary, body: locked.body, kinds: locked.kinds } });
+    if (locked.version !== input.version) {
+      const [lastEdit] = await tx.select({ by: users.displayName, at: itemVersions.createdAt }).from(itemVersions)
+        .innerJoin(users, eq(users.id, itemVersions.editedBy)).where(eq(itemVersions.itemId, id)).orderBy(desc(itemVersions.version)).limit(1);
+      const tagMap = await tagsForItems(tx, [id]);
+      throw new AppError(409, "version_conflict", {
+        current: {
+          version: locked.version, title: locked.title, summary: locked.summary, body: locked.body, kinds: locked.kinds,
+          tags: (tagMap.get(id) ?? []).map((t) => t.name), editedBy: lastEdit?.by ?? null, editedAt: lastEdit?.at ?? null,
+        },
+      });
+    }
     const p = prepareContent(input);
 
     const next = locked.version + 1;
     await tx.update(items).set({
       title: p.title, summary: p.summary, body: p.body, kinds: p.kinds,
-      version: next, searchText: searchText(p), updatedBy: ctx.userId, updatedAt: new Date(),
+      version: next, searchText: searchText(p, await attachmentNamesOf(tx, id)), updatedBy: ctx.userId, updatedAt: new Date(),
     }).where(eq(items.id, id));
     await replaceItemTags(tx, ctx, id, p.tags);
 
     // แก้ต่อเนื่องโดยคนเดิมภายใน 5 นาที รวมเป็นเวอร์ชันเดียว (§10.1)
     const [last] = await tx.select().from(itemVersions).where(eq(itemVersions.itemId, id)).orderBy(desc(itemVersions.version)).limit(1);
-    if (last && last.editedBy === ctx.userId && Date.now() - last.createdAt.getTime() < MERGE_WINDOW_MS) {
+    if (!opts.noMerge && last && last.editedBy === ctx.userId && Date.now() - last.createdAt.getTime() < MERGE_WINDOW_MS) {
       await tx.update(itemVersions).set({ version: next, snapshot: snapshot(p) }).where(eq(itemVersions.id, last.id));
     } else {
       await tx.insert(itemVersions).values({ itemId: id, version: next, snapshot: snapshot(p), editedBy: ctx.userId });
     }
-    await audit(tx, req, { workspaceId: ctx.workspaceId, actorId: ctx.userId, action: "item.updated", targetType: "item", targetId: id, after: { version: next } });
+    await audit(tx, req, { workspaceId: ctx.workspaceId, actorId: ctx.userId, action: opts.action ?? "item.updated", targetType: "item", targetId: id, after: { version: next, ...opts.auditExtra } });
     return next;
   });
 }

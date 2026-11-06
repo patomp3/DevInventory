@@ -113,5 +113,100 @@ chk note-put-409 409 "$(code -b M.jar -X PUT $B/api/v1/items/$S1 -H "$O" -H "$J"
 chk note-put-nokind-422 422 "$(code -b M.jar -X PUT $B/api/v1/items/$S1 -H "$O" -H "$J" -d '{"version":2,"title":"x","kinds":[]}')"
 chk note-search-text "t" "$($PSQL -t -A -c "select (search_text like '%a.yml%' and search_text like '%k8s%' and search_text not like '%\`\`\`%') from items where id='$S1'")"
 chk snapshot-kinds '["link"]' "$($PSQL -t -A -c "select snapshot->'kinds' from item_versions where item_id='$S1' order by version desc limit 1")"
+# --- ไฟล์แนบ (สัปดาห์ 5): สิทธิ์ผ่านรายการแม่, MIME จากเนื้อไฟล์, header ดาวน์โหลด, ลบ, search_text
+T=$(mktemp -d); TW=$(cygpath -m "$T" 2>/dev/null || echo "$T")   # curl บน Windows อ่าน path แบบ /tmp/... ของ Git Bash ไม่ได้ → ใช้ path แบบ Windows
+$PY - "$TW" <<'PYEOF'
+import sys
+d = sys.argv[1]
+open(d + "/pic.png", "wb").write(b"\x89PNG\r\n\x1a\n0123456789abcdef")   # PNG signature + ข้อมูลเติม
+open(d + "/note.txt", "wb").write(b"hello attachment\n")
+open(d + "/evil.png", "wb").write(b"<script>alert(1)</script>")         # ปลอมเป็นรูป
+open(d + "/empty.bin", "wb").close()
+open(d + "/big.bin", "wb").write(b"\0" * 52428801)                      # เกิน 50 MB
+PYEOF
+
+PNG_SIZE=$(wc -c < "$T/pic.png" | tr -d ' ')
+up() { curl -s -b "$1" -H "$O" -F "file=@$3;filename=$4" "$B/api/v1/items/$2/attachments"; }   # up jar item file filename
+upc() { curl -s -o /dev/null -w "%{http_code}" -b "$1" -H "$O" -F "file=@$3;filename=$4" "$B/api/v1/items/$2/attachments"; }
+hdr() { curl -s -D - -o /dev/null -b "$1" "$B/api/v1/attachments/$2/download" | tr -d '\r'; }
+AP=$(up M.jar $S1 "$TW/pic.png" "../pic.png")
+AP_ID=$(echo "$AP" | j "['attachment']['id']")
+chk att-upload-name pic.png "$(echo "$AP" | j "['attachment']['name']")"
+chk att-upload-mime image/png "$(echo "$AP" | j "['attachment']['mime']")"
+H=$(hdr M.jar $AP_ID)
+chk att-dl-200 "HTTP/1.1 200 OK" "$(echo "$H" | head -1)"
+chk att-dl-inline-image 1 "$(echo "$H" | grep -ci '^content-disposition: inline')"
+chk att-dl-nosniff 1 "$(echo "$H" | grep -ci '^x-content-type-options: nosniff')"
+chk att-dl-no-store 1 "$(echo "$H" | grep -ci '^cache-control: private, no-store')"
+chk att-dl-bytes "$PNG_SIZE" "$(curl -s -b M.jar "$B/api/v1/attachments/$AP_ID/download" | wc -c | tr -d ' ')"
+AT_ID=$(up M.jar $S1 "$TW/note.txt" "note.txt" | j "['attachment']['id']")
+H2=$(hdr M.jar $AT_ID)
+chk att-txt-forced-download 1 "$(echo "$H2" | grep -ci '^content-disposition: attachment')"
+AE=$(up M.jar $S1 "$TW/evil.png" "evil.png")
+chk att-fake-image-mime application/octet-stream "$(echo "$AE" | j "['attachment']['mime']")"
+chk att-fake-image-attachment 1 "$(hdr M.jar $(echo "$AE" | j "['attachment']['id']") | grep -ci '^content-disposition: attachment')"
+chk att-empty-422 422 "$(upc M.jar $S1 "$TW/empty.bin" "e.bin")"
+chk att-too-large-413 413 "$(upc M.jar $S1 "$TW/big.bin" "big.bin")"
+chk att-list-3 3 "$(m $B/api/v1/items/$S1/attachments | j "['attachments'].__len__()")"
+chk att-search-text t "$($PSQL -t -A -c "select (search_text like '%pic.png%' and search_text like '%note.txt%') from items where id='$S1'")"
+chk att-admin-nonprivate-dl 200 "$(code -b A.jar "$B/api/v1/attachments/$AP_ID/download")"
+# สิทธิ์: ไฟล์แนบใช้สิทธิ์ของรายการแม่เสมอ
+AS2=$(up M.jar $S2 "$TW/note.txt" "secret.txt" | j "['attachment']['id']")
+chk att-private-owner-dl 200 "$(code -b M.jar "$B/api/v1/attachments/$AS2/download")"
+chk att-private-admin-404 404 "$(code -b A.jar "$B/api/v1/attachments/$AS2/download")"
+chk att-private-admin-list-404 404 "$(code -b A.jar "$B/api/v1/items/$S2/attachments")"
+chk att-private-admin-upload-404 404 "$(upc A.jar $S2 "$TW/note.txt" "x.txt")"
+chk att-private-admin-delete-404 404 "$(code -b A.jar -X DELETE "$B/api/v1/attachments/$AS2" -H "$O")"
+chk att-unauth-401 401 "$(code "$B/api/v1/attachments/$AP_ID/download")"
+chk att-bad-id-404 404 "$(code -b M.jar "$B/api/v1/attachments/00000000-0000-7000-8000-000000000000/download")"
+chk att-csrf-403 403 "$(curl -s -o /dev/null -w "%{http_code}" -b M.jar -F "file=@$T/note.txt" "$B/api/v1/items/$S1/attachments")"
+# ดูได้แต่แก้ไม่ได้ → 403 (อัปโหลด/ลบ) แต่ยังดาวน์โหลดได้
+IV=$(a -X POST $B/api/v1/items -d "{\"title\":\"view only\",\"collectionId\":\"$CB\"}" | j "['id']")
+AV=$(up A.jar $IV "$TW/note.txt" "ro.txt" | j "['attachment']['id']")
+chk att-viewer-upload-403 403 "$(upc M.jar $IV "$TW/note.txt" "x.txt")"
+chk att-viewer-delete-403 403 "$(code -b M.jar -X DELETE "$B/api/v1/attachments/$AV" -H "$O")"
+chk att-viewer-download-200 200 "$(code -b M.jar "$B/api/v1/attachments/$AV/download")"
+# ลบ: soft delete แล้วดาวน์โหลดไม่ได้ และชื่อไฟล์หายจาก search_text
+chk att-delete-200 200 "$(code -b M.jar -X DELETE "$B/api/v1/attachments/$AP_ID" -H "$O")"
+chk att-deleted-404 404 "$(code -b M.jar "$B/api/v1/attachments/$AP_ID/download")"
+chk att-list-after-delete 2 "$(m $B/api/v1/items/$S1/attachments | j "['attachments'].__len__()")"
+chk att-search-text-removed t "$($PSQL -t -A -c "select (search_text not like '%pic.png%' and search_text like '%note.txt%') from items where id='$S1'")"
+chk att-save-keeps-search-name t "$(m -X PUT $B/api/v1/items/$S1 -d "{\"version\":$(m $B/api/v1/items/$S1 | j "['item']['version']"),\"title\":\"compose3\"}" >/dev/null; $PSQL -t -A -c "select search_text like '%note.txt%' from items where id='$S1'")"
+chk att-audit 1 "$($PSQL -t -A -c "select (count(*) > 0)::int from audit_logs where action='attachment.uploaded' and target_id='$S1'")"
+rm -rf "$T"
+# --- ประวัติเวอร์ชัน + กู้เวอร์ชัน (สัปดาห์ 5)
+ver() { m $B/api/v1/items/$S1 | j "['item']['version']"; }
+V0=$(ver)
+OLD_TITLE=$(m $B/api/v1/items/$S1 | j "['item']['title']")
+chk hist-admin-edit-200 200 "$(code -b A.jar -X PUT $B/api/v1/items/$S1 -H "$O" -H "$J" -d "{\"version\":$V0,\"title\":\"by admin\",\"body\":\"ADMIN BODY\"}")"
+V1=$((V0+1))
+chk hist-list-2 2 "$(m $B/api/v1/items/$S1/versions | j "['versions'].__len__()")"
+chk hist-list-newest-first "[$V1, $V0]" "$(m $B/api/v1/items/$S1/versions | $PY -c "import sys,json; print([v['version'] for v in json.load(sys.stdin.buffer)['versions']])")"
+chk hist-get-old-title "$OLD_TITLE" "$(m $B/api/v1/items/$S1/versions/$V0 | j "['view']['title']")"
+chk hist-get-prev-version "$V0" "$(m $B/api/v1/items/$S1/versions/$V1 | j "['prev']['version']")"
+chk hist-get-first-no-prev None "$(m $B/api/v1/items/$S1/versions/$V0 | j "['prev']")"
+chk hist-get-missing-404 404 "$(code -b M.jar $B/api/v1/items/$S1/versions/9999)"
+chk hist-get-bad-422 422 "$(code -b M.jar $B/api/v1/items/$S1/versions/abc)"
+chk hist-restore-current-422 422 "$(code -b M.jar -X POST $B/api/v1/items/$S1/versions/$V1/restore -H "$O" -H "$J" -d "{\"version\":$V1}")"
+chk hist-restore-stale-409 409 "$(code -b M.jar -X POST $B/api/v1/items/$S1/versions/$V0/restore -H "$O" -H "$J" -d "{\"version\":$V0}")"
+chk hist-restore-ok $((V1+1)) "$(m -X POST $B/api/v1/items/$S1/versions/$V0/restore -d "{\"version\":$V1}" | j "['version']")"
+chk hist-restore-content "$OLD_TITLE" "$(m $B/api/v1/items/$S1 | j "['item']['title']")"
+# กู้ซ้ำโดยคนเดิมภายใน 5 นาที ต้องเกิดเวอร์ชันใหม่เสมอ (ไม่รวมเป็นเวอร์ชันเดียว)
+chk hist-restore-twice $((V1+2)) "$(m -X POST $B/api/v1/items/$S1/versions/$V1/restore -d "{\"version\":$((V1+1))}" | j "['version']")"
+chk hist-restore-no-merge 4 "$(m $B/api/v1/items/$S1/versions | j "['versions'].__len__()")"
+chk hist-restore-content2 "by admin" "$(m $B/api/v1/items/$S1 | j "['item']['title']")"
+chk hist-restore-audit 1 "$($PSQL -t -A -c "select (count(*) >= 2)::int from audit_logs where action='item.version_restored' and target_id='$S1'")"
+chk hist-restore-csrf-403 403 "$(code -b M.jar -X POST $B/api/v1/items/$S1/versions/$V0/restore -H "$J" -d "{\"version\":$((V1+2))}")"
+chk hist-unauth-401 401 "$(code $B/api/v1/items/$S1/versions)"
+# ผู้ดูอย่างเดียว: ดูประวัติได้ กู้ไม่ได้ (403)
+chk hist-viewer-list-200 200 "$(code -b M.jar $B/api/v1/items/$IV/versions)"
+chk hist-viewer-restore-403 403 "$(code -b M.jar -X POST $B/api/v1/items/$IV/versions/1/restore -H "$O" -H "$J" -d '{"version":1}')"
+# ไม่มีสิทธิ์ดู (private ของ member) → 404 ทุกทาง แม้เป็น Admin
+chk hist-private-admin-list-404 404 "$(code -b A.jar $B/api/v1/items/$S2/versions)"
+chk hist-private-admin-get-404 404 "$(code -b A.jar $B/api/v1/items/$S2/versions/1)"
+chk hist-private-admin-restore-404 404 "$(code -b A.jar -X POST $B/api/v1/items/$S2/versions/1/restore -H "$O" -H "$J" -d '{"version":1}')"
+chk hist-private-owner-list-200 200 "$(code -b M.jar $B/api/v1/items/$S2/versions)"
+# 409 ต้องแนบสถานะล่าสุดพร้อม tag และคนแก้ล่าสุด (ใช้แสดง dialog 3 ทาง)
+chk conflict-payload-keys "body,editedAt,editedBy,kinds,summary,tags,title,version" "$(code_body() { curl -s -b M.jar -X PUT $B/api/v1/items/$S1 -H "$O" -H "$J" -d '{"version":1,"title":"x"}'; }; code_body | $PY -c "import sys,json; print(','.join(sorted(json.load(sys.stdin.buffer)['current'].keys())))")"
 # ผลรวม
 echo "passed=$pass failed=$failn"
