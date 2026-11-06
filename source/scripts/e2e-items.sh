@@ -336,5 +336,87 @@ chk trash-job-file-removed 0 "$([ -f "$FILES_HOST/$KEY_D" ] && echo 1 || echo 0)
 chk trash-job-keeps-recent 1 "$($PSQL -t -A -c "select count(*) from items where id='$TA' and deleted_at is not null")"
 chk trash-job-audit-retention 1 "$($PSQL -t -A -c "select (count(*) = 1)::int from audit_logs where action='item.purged' and target_id='$TD' and actor_id is null and after->>'reason'='retention'")"
 rm -rf "$TT"
+TT=$(mktemp -d); TTW=$(cygpath -m "$TT" 2>/dev/null || echo "$TT")
+# --- Admin (สัปดาห์ 7): ตั้งค่า, รายการส่วนตัว (metadata), โอนเจ้าของ (D6), Audit log
+n() { curl -s -b N.jar -H "$O" -H "$J" "$@"; }
+M_ID=$($PSQL -t -A -c "select id from users where email = lower('$MEMBER_EMAIL')")
+A_ID=$($PSQL -t -A -c "select id from users where email = lower('$ADMIN_EMAIL')")
+NEW_EMAIL="n-$MEMBER_EMAIL"
+INVN=$(a -X POST $B/api/v1/admin/invites -d "{\"email\":\"$NEW_EMAIL\"}"); TOKN=$(echo "$INVN" | j "['link']"); TOKN=${TOKN##*/}
+curl -s -c N.jar -X POST $B/api/v1/auth/accept-invite -H "$O" -H "$J" -d "{\"token\":\"$TOKN\",\"displayName\":\"NewOwner\",\"password\":\"Member-Pass-2026\"}" >/dev/null
+N_ID=$($PSQL -t -A -c "select id from users where email = lower('$NEW_EMAIL')")
+chk adm-new-user-created 36 "$(echo -n $N_ID | wc -c)"
+# ตั้งค่า Workspace
+chk adm-settings-get "True" "$(a $B/api/v1/admin/settings | j "['settings']['name'].__len__() > 0")"
+chk adm-settings-limits "50 7 30" "$(a $B/api/v1/admin/settings | $PY -c "import sys,json; l=json.load(sys.stdin.buffer)['limits']; print(l['maxFileMb'], l['inviteDays'], l['trashDays'])")"
+chk adm-settings-member-404 404 "$(code -b M.jar $B/api/v1/admin/settings)"
+chk adm-settings-unauth-401 401 "$(code $B/api/v1/admin/settings)"
+chk adm-settings-patch-200 200 "$(code -b A.jar -X PATCH $B/api/v1/admin/settings -H "$O" -H "$J" -d '{"name":"E2E Team","defaultVisibility":"workspace_view"}')"
+chk adm-settings-name-saved "E2E Team" "$(a $B/api/v1/admin/settings | j "['settings']['name']")"
+chk adm-settings-empty-name-422 422 "$(code -b A.jar -X PATCH $B/api/v1/admin/settings -H "$O" -H "$J" -d '{"name":"   ","defaultVisibility":"workspace_view"}')"
+chk adm-settings-inherit-422 422 "$(code -b A.jar -X PATCH $B/api/v1/admin/settings -H "$O" -H "$J" -d '{"name":"x","defaultVisibility":"inherit"}')"
+chk adm-settings-member-patch-404 404 "$(code -b M.jar -X PATCH $B/api/v1/admin/settings -H "$O" -H "$J" -d '{"name":"hack","defaultVisibility":"private"}')"
+chk adm-settings-csrf-403 403 "$(code -b A.jar -X PATCH $B/api/v1/admin/settings -H "$J" -d '{"name":"x","defaultVisibility":"workspace_view"}')"
+chk adm-settings-same-no-audit 1 "$(a -X PATCH $B/api/v1/admin/settings -d '{"name":"E2E Team","defaultVisibility":"workspace_view"}' >/dev/null; $PSQL -t -A -c "select count(*) from audit_logs where action='workspace.settings_changed' and actor_id='$A_ID'")"
+# รายการส่วนตัว: metadata เท่านั้น ไม่มีเนื้อหา
+PI=$(a $B/api/v1/admin/private-items)
+chk adm-private-lists-title 1 "$(echo "$PI" | grep -c 'secret script')"
+chk adm-private-no-body 0 "$(echo "$PI" | grep -c 'pg_dump')"
+chk adm-private-keys "createdAt,id,kinds,owner,sizeBytes,title" "$(echo "$PI" | $PY -c "import sys,json; print(','.join(sorted(json.load(sys.stdin.buffer)['items'][0].keys())))")"
+chk adm-private-member-404 404 "$(code -b M.jar $B/api/v1/admin/private-items)"
+chk adm-private-unauth-401 401 "$(code $B/api/v1/admin/private-items)"
+chk adm-private-excludes-nonprivate 0 "$(echo "$PI" | grep -c 'xyzkb backup nightly')"
+chk adm-private-excludes-deleted 0 "$(echo "$PI" | grep -c 'zzt private')"
+# โอนเจ้าของ: เงื่อนไข D6
+chk adm-xfer-private-owner-active-403 403 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$N_ID\"}")"
+chk adm-xfer-member-404 404 "$(code -b M.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$N_ID\"}")"
+chk adm-xfer-unauth-401 401 "$(code -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$N_ID\"}")"
+chk adm-xfer-csrf-403 403 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$J" -d "{\"newOwnerId\":\"$N_ID\"}")"
+chk adm-xfer-bad-body-422 422 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d '{"newOwnerId":"nope"}')"
+chk adm-xfer-unknown-owner-422 422 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d '{"newOwnerId":"00000000-0000-7000-8000-000000000000"}')"
+chk adm-xfer-same-owner-422 422 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$M_ID\"}")"
+chk adm-xfer-missing-item-404 404 "$(code -b A.jar -X POST $B/api/v1/admin/items/00000000-0000-7000-8000-000000000000/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$N_ID\"}")"
+chk adm-xfer-deleted-item-404 404 "$(code -b A.jar -X POST $B/api/v1/admin/items/$SD/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$N_ID\"}")"
+chk adm-xfer-nonprivate-200 200 "$(code -b A.jar -X POST $B/api/v1/admin/items/$SB/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$N_ID\"}")"
+chk adm-xfer-nonprivate-owner-changed NewOwner "$(n $B/api/v1/items/$SB | j "['item']['ownerName']")"
+# ปิดบัญชีเจ้าของ (M) → โอนรายการส่วนตัวได้ แต่ไม่ให้ตัว Admin เอง และไม่ให้ผู้ใช้ที่ถูกปิด
+chk adm-disable-owner-200 200 "$(code -b A.jar -X PATCH $B/api/v1/admin/users/$M_ID -H "$O" -H "$J" -d '{"status":"disabled"}')"
+chk adm-private-shows-disabled disabled "$(a $B/api/v1/admin/private-items | $PY -c "import sys,json; print([i['owner']['status'] for i in json.load(sys.stdin.buffer)['items'] if i['id']=='$S2'][0])")"
+chk adm-xfer-private-to-self-403 403 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$A_ID\"}")"
+chk adm-xfer-to-disabled-422 422 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$M_ID\"}")"
+chk adm-xfer-private-admin-still-404 404 "$(code -b A.jar $B/api/v1/items/$S2)"
+chk adm-xfer-private-ok 200 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$N_ID\"}")"
+chk adm-xfer-new-owner-reads 200 "$(code -b N.jar $B/api/v1/items/$S2)"
+chk adm-xfer-stays-private private "$(n $B/api/v1/items/$S2 | j "['item']['effectiveVisibility']")"
+chk adm-xfer-admin-still-404-after 404 "$(code -b A.jar $B/api/v1/items/$S2)"
+chk adm-xfer-audit 2 "$($PSQL -t -A -c "select count(*) from audit_logs where action='item.owner_transferred' and target_id in ('$S2','$SB')")"
+chk adm-xfer-audit-before-owner "$M_ID" "$($PSQL -t -A -c "select before->>'ownerId' from audit_logs where action='item.owner_transferred' and target_id='$S2'")"
+chk adm-private-after-xfer-owner-new NewOwner "$(a $B/api/v1/admin/private-items | $PY -c "import sys,json; print([i['owner']['name'] for i in json.load(sys.stdin.buffer)['items'] if i['id']=='$S2'][0])")"
+chk adm-xfer-private-to-self-after-active-owner-403 403 "$(code -b A.jar -X POST $B/api/v1/admin/items/$S2/transfer -H "$O" -H "$J" -d "{\"newOwnerId\":\"$A_ID\"}")"
+# Audit log
+AL=$(a "$B/api/v1/admin/audit-logs")
+chk adm-audit-has-rows True "$(echo "$AL" | j "['total'] > 20")"
+chk adm-audit-matches-db "$($PSQL -t -A -c "select count(*) from audit_logs where workspace_id=(select workspace_id from users where id='$A_ID')")" "$(echo "$AL" | j "['total']")"
+chk adm-audit-page-size 50 "$(echo "$AL" | j "['rows'].__len__()")"
+chk adm-audit-page2 True "$(a "$B/api/v1/admin/audit-logs?page=1" | j "['rows'].__len__() > 0")"
+chk adm-audit-filter-action True "$(a "$B/api/v1/admin/audit-logs?action=item.owner_transferred" | j "['total'] == 2 and all(r['action']=='item.owner_transferred' for r in d['rows'])")"
+chk adm-audit-filter-user True "$(a "$B/api/v1/admin/audit-logs?user=$N_ID" | j "['rows'].__len__() > 0 and all(r['actorEmail'].startswith('n-') for r in d['rows'])")"
+chk adm-audit-filter-future-empty 0 "$(a "$B/api/v1/admin/audit-logs?from=2999-01-01" | j "['total']")"
+chk adm-audit-filter-past-empty 0 "$(a "$B/api/v1/admin/audit-logs?to=2000-01-01" | j "['total']")"
+chk adm-audit-filter-range-has True "$(a "$B/api/v1/admin/audit-logs?from=2000-01-01&to=2999-01-01" | j "['total'] > 20")"
+chk adm-audit-bad-date-ignored True "$(a "$B/api/v1/admin/audit-logs?from=not-a-date'%3B--" | j "['total'] > 20")"
+chk adm-audit-member-404 404 "$(code -b N.jar "$B/api/v1/admin/audit-logs")"
+chk adm-audit-unauth-401 401 "$(code "$B/api/v1/admin/audit-logs")"
+CSV_H=$(curl -s -D - -o "$TTW/audit.csv" -b A.jar "$B/api/v1/admin/audit-logs?format=csv&action=item.owner_transferred" | tr -d '\r')
+chk adm-csv-type 1 "$(echo "$CSV_H" | grep -ci '^content-type: text/csv')"
+chk adm-csv-attachment 1 "$(echo "$CSV_H" | grep -ci '^content-disposition: attachment')"
+chk adm-csv-no-store 1 "$(echo "$CSV_H" | grep -ci '^cache-control: private, no-store')"
+chk adm-csv-bom efbbbf "$(head -c 3 "$TT/audit.csv" | od -An -tx1 | tr -d ' \n')"
+chk adm-csv-rows 3 "$(tr -d '\r' < "$TT/audit.csv" | grep -c .)"
+chk adm-csv-member-404 404 "$(code -b N.jar "$B/api/v1/admin/audit-logs?format=csv")"
+# audit_logs เป็น append-only ใน DB
+chk adm-audit-append-only 1 "$($PSQL -c "update audit_logs set action='x' where id=(select min(id) from audit_logs)" 2>&1 | grep -c 'append-only')"
+chk adm-audit-no-delete 1 "$($PSQL -c "delete from audit_logs where id=(select min(id) from audit_logs)" 2>&1 | grep -c 'append-only')"
+rm -f N.jar; rm -rf "$TT"
 # ผลรวม
 echo "passed=$pass failed=$failn"

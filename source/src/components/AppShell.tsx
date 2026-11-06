@@ -40,6 +40,9 @@ export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; 
             <>
               <p className="px-3 pb-1 pt-4 text-[13px] font-semibold text-muted">ผู้ดูแลระบบ</p>
               {item("/admin/users", "ผู้ใช้")}
+              {item("/admin/private-items", "รายการส่วนตัว")}
+              {item("/admin/audit", "Audit log")}
+              {item("/admin/settings", "ตั้งค่า")}
             </>
           )}
         </nav>

@@ -55,6 +55,23 @@ export function userRoute<P = Record<string, string>>(
   };
 }
 
+/** route สำหรับ Admin ของ workspace: ตรวจ Origin + session + บทบาท (ไม่ใช่ Admin = 404 ไม่เปิดเผยว่ามีหน้านี้) และแปลง AppError เป็น HTTP */
+export function adminRoute<P = Record<string, string>>(
+  fn: (a: { req: Request; ctx: Ctx; user: SessionUser; params: P }) => Promise<Response>,
+) {
+  return async (req: Request, { params }: { params: Promise<P> }) => {
+    try {
+      const me = await requireAdmin(req);
+      if (me instanceof Response) return me;
+      if (me.mustChangePassword) return fail(403, "must_change_password");
+      return await fn({ req, ctx: toCtx(me), user: me, params: await params });
+    } catch (e) {
+      if (e instanceof AppError) return fail(e.status, e.code, e.extra);
+      throw e;
+    }
+  };
+}
+
 export async function readJson(req: Request): Promise<unknown> {
   return req.json().catch(() => { throw new AppError(400, "invalid_json"); });
 }

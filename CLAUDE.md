@@ -25,8 +25,8 @@ Next.js 15 App Router (TypeScript, webpack) · Drizzle ORM + `pg` · PostgreSQL 
 | 4 | Editor Markdown + code fence (Shiki, Copy), ป้าย kinds (D22), tag | เสร็จ (ตรวจในเบราว์เซอร์แล้ว: สร้าง/แก้ Note หลายป้าย, code fence highlight + Copy, รายการที่แปลงจากข้อมูลเก่า) |
 | 5 | ไฟล์แนบใต้ Note, หน้า History + diff + กู้เวอร์ชัน, dialog 409 แบบ 3 ทาง | เสร็จ (e2e 113/113 + ตรวจในเบราว์เซอร์: อัปโหลดรูปชื่อไทย, dialog 409, History ของ snapshot เก่า) |
 | 6 | ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet | เสร็จ (e2e 163/163, วัดที่ 50,000 รายการ: ค้นทั่วไป 3–55 ms / กรณีสุดโต่ง 279 ms, ตรวจในเบราว์เซอร์) |
-| 7 | ถังขยะ, Admin › รายการส่วนตัว/audit log/ตั้งค่า, backup | **ถัดไป** |
-| 8 | ทดสอบตาม DoD, แก้บั๊ก, เอกสาร, deploy | |
+| 7 | ถังขยะ, Admin › รายการส่วนตัว/audit log/ตั้งค่า/โอนเจ้าของ, backup + runbook | เสร็จ (e2e 264/264, ข้าม workspace 22/22, restore-test จริง) — **restic/compose บนเซิร์ฟเวอร์จริงยังไม่เคยรัน** |
+| 8 | ทดสอบตาม DoD, แก้บั๊ก, เอกสาร, deploy | **ถัดไป** |
 
 เลื่อนไปเฟส 2 (อย่าทำตอนนี้): Google login, share รายบุคคล/กลุ่ม, access requests, pin, notifications, หน้า "บัญชีของฉัน", mobile, light mode
 
@@ -42,16 +42,17 @@ src/lib/item-schema.ts zod body ของ POST/PUT items  ·  src/lib/tags.ts  r
 src/lib/attachments.ts ไฟล์แนบ: upload/list/download/delete (สิทธิ์ผ่านรายการแม่ + soft delete) · src/lib/attachment-meta.ts pure: sniffMime (magic bytes), cleanFilename, contentDisposition, ขีดจำกัด
 src/lib/versions.ts    listVersions / getVersionWithPrev / restoreVersion (กู้ = เวอร์ชันใหม่ ไม่ merge) · src/lib/item-history.ts pure: snapshotToView (รองรับ snapshot เก่า+ใหม่), sideBySide (diff), changedFields
 src/lib/search/query.ts  searchItems (ผล+total+facet+คำแนะนำ) / quickSearch — ทุก query ผ่าน visibleItemsWhere ใน SQL · src/lib/search/snippet.ts pure: highlight, bodyExcerpt, buildResultSnippet
+src/lib/trash.ts      ถังขยะ: listTrash / restoreItem / purgeItem / purgeExpired (งานรายคืน 30 วัน) · src/lib/admin-items.ts รายการส่วนตัว (metadata) + transferItem · src/lib/admin-audit.ts + audit-format.ts (กรอง/CSV) · src/lib/workspace-settings.ts
 src/lib/highlight.ts   Shiki highlighter ตัวเดียว (JS regex engine, ธีมเองตาม ui-design §3.1) ใช้ผ่าน @shikijs/rehype ใน MarkdownView
 src/lib/auth/          Better Auth config (lazy), session helper, password policy
 src/lib/api.ts         userRoute()/requireAdmin() — ตรวจ Origin(CSRF) + session + แปลง AppError → HTTP
 src/lib/audit.ts       เขียน audit_logs   ·  src/lib/errors.ts  AppError, notFound
 src/lib/db/schema.ts   Drizzle schema (ต้องตรงกับ drizzle/*.sql)
-src/app/api/v1/…       REST: auth, admin/{users,invites}, collections, search (+ /quick), items (+ /attachments, /versions, /versions/:v/restore), attachments/:id (+ /download), tags
+src/app/api/v1/…       REST: auth, admin/{users,invites,private-items,items/:id/transfer,audit-logs,settings}, trash, collections, search (+ /quick), items (+ /attachments, /versions, /versions/:v/restore), attachments/:id (+ /download), tags
 src/components/        MarkdownView (server, MarkdownAsync: sanitize → Shiki) + CodePre (Copy), CodeEditor (CodeMirror 6 โหมด Markdown), TagInput, KindChips, ItemEditor (Editor เดียว), AttachmentPanel/AttachmentList, DiffView, ConflictDialog (409 แบบ 3 ทาง), CommandPalette (Ctrl+K, cmdk) + RecentTracker, Marked (ไฮไลต์)
 src/app/(app)/…        หน้าหลังล็อกอิน (layout ตรวจ session + sidebar tree)
 drizzle/*.sql          migration แบบ SQL ล้วน รันด้วย scripts/migrate.ts ตามชื่อไฟล์
-scripts/               migrate, seed, doctor, poc-thai-search, e2e-auth.sh, e2e-items.sh
+scripts/               migrate, seed, doctor, poc-thai-search, purge-trash.ts (job:purge), reset-password.ts (user:reset-password), backup.sh, restore-test.sh, e2e-auth.sh, e2e-items.sh
 tests/                 Vitest unit tests (ไม่ต้องใช้ DB)
 ```
 
@@ -95,9 +96,9 @@ npm run dev                      # http://localhost:3000
 
 ## ทดสอบ
 
-- `npm test` (Vitest, 105 เคส: permission matrix, search (normalize/parseQuery/query), snippet (ไฮไลต์), password policy, item-content, attachment-meta, item-history) · `npm run typecheck` · `npm run build`
+- `npm test` (Vitest, 120 เคส: permission matrix (รวมถังขยะ), audit-format (CSV), search (normalize/parseQuery/query), snippet (ไฮไลต์), password policy, item-content, attachment-meta, item-history) · `npm run typecheck` · `npm run build`
 - e2e (ต้องมีเซิร์ฟเวอร์รันอยู่ + DB ที่ seed แล้ว + `psql`; เขียนเป็น bash — บน Windows ใช้ Git Bash/WSL): `scripts/e2e-auth.sh` (login lockout, เชิญ, รีเซ็ตรหัส, ปิดบัญชี) และ `scripts/e2e-items.sh` (สิทธิ์/สืบทอด/409/ความลึก + ป้าย/tag/Markdown) ตั้งตัวแปร env `B`, `PSQL`, `ADMIN_EMAIL`, `ADMIN_PW`, `MEMBER_EMAIL`, `PY` ให้ตรงกับเครื่อง — บนเครื่องนี้: `PY=python` (python3 เป็นแค่ stub ของ Store), `PSQL="docker exec -i source-db-1 psql -U inventory inventory"`, `B=http://localhost:3100`
-- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-06 หลังสัปดาห์ 6: 163/163 ผ่าน) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน · `curl -F file=@…` บน Windows อ่าน path แบบ `/tmp/…` ไม่ได้ ต้องใช้ `cygpath -m` (สคริปต์ทำให้แล้ว)
+- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-06 หลังสัปดาห์ 7: 264/264 ผ่าน) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน · `curl -F file=@…` บน Windows อ่าน path แบบ `/tmp/…` ไม่ได้ ต้องใช้ `cygpath -m` (สคริปต์ทำให้แล้ว)
 - เพิ่มเทสต์ทุกครั้งที่แตะ permission engine; ทุก endpoint ใหม่ต้องมีเคส "ไม่มีสิทธิ์ → 404" และ "ข้าม workspace"
 - ยังไม่มีเทส UI/Playwright (อยู่ในแผนสัปดาห์ 8) — หน้า Editor/Detail/หน้าแรก ตรวจในเบราว์เซอร์แล้ว แต่หน้า Login/Admin/Collection ของสัปดาห์ 2–3 ยังไม่ได้ไล่ดูละเอียดเทียบ ui-design
 - พอร์ต 3000 บนเครื่องนี้มีบริการอื่น (Gotenberg) จับอยู่ — `.claude/launch.json` รัน dev ที่ **3100**
@@ -137,12 +138,22 @@ npm run dev                      # http://localhost:3000
 - **เปิดล่าสุด** ใน palette เก็บใน localStorage ของเบราว์เซอร์ คีย์ตาม user id (`di-recent:<userId>`) ไม่ขึ้น server — ใช้ได้โดยไม่มี localStorage
 - ทดสอบความเร็ว: สร้าง workspace ชั่วคราว + `generate_series` 50,000 แถว ใส่ ICU th-TH แล้วลบทิ้ง (สคริปต์ไม่อยู่ใน repo) ถ้าแก้ query ค้นหาให้วัดซ้ำด้วยคำที่ตรงทุกแถว (กรณีแย่สุด)
 
+## สัปดาห์ 7 — ถังขยะ / Admin / backup — ข้อควรรู้
+
+- **ถังขยะ** (design §10.3): `GET /trash`, `POST /items/:id/restore`, `DELETE /trash/:id` (ลบถาวร) · สิทธิ์อยู่ที่ `canManageTrashed` + `trashedItemsWhere` ใน `src/lib/permissions` (เจ้าของจัดการของตัวเอง, Admin เฉพาะที่ไม่ใช่ private, ไม่มีสิทธิ์/ไม่ใช่ของถังขยะ = 404) · กู้: กลับ Collection เดิม ถ้า Collection ถูกลบแล้วไป Inbox และ `inherit` → ค่า default ของ workspace · ลบถาวร: ลบแถวไฟล์แนบ + **ไฟล์จริงบนดิสก์หลัง commit** + audit `item.purged` · การลบ Collection ยังต้องว่างก่อน (ไม่ได้ลบรายการข้างในแบบ soft delete ตาม §10.3 — ของสัปดาห์ 3 ยังไม่เปลี่ยน)
+- **งานรายคืน** `npm run job:purge` (`purgeExpired`): รายการที่ `deleted_at` เกิน 30 วัน + ไฟล์แนบที่ถูกลบเกิน 30 วัน · audit actor = null, reason = retention · compose service `purge` วนวันละครั้งนับจากเวลา container เริ่ม
+- **Admin › รายการส่วนตัว** (`listPrivateItems`): เลือกเฉพาะคอลัมน์ metadata (ชื่อ ป้าย เจ้าของ วันที่ ขนาด) **ห้ามเพิ่ม body/summary/search_text/ชื่อไฟล์แนบ** — e2e ตรวจว่าเนื้อหาไม่หลุด · **โอนเจ้าของ** (`transferItem` ใช้ `canTransfer`): รายการส่วนตัวโอนได้เฉพาะเมื่อเจ้าของถูกปิดบัญชี ผู้รับต้อง active ใน workspace เดียวกัน และห้ามเป็น Admin ผู้โอนเอง (D6) · รายการไม่ส่วนตัวโอนได้ผ่าน API (ไม่มีปุ่มใน UI) · ยังเป็นส่วนตัวหลังโอน · audit `item.owner_transferred`
+- **`adminRoute`** (`src/lib/api.ts`): route ของ Admin ที่ตรวจ Origin + session + role (ไม่ใช่ Admin = 404) และแปลง AppError — ใช้กับ endpoint Admin ใหม่ (users/invites เดิมยังใช้ `requireAdmin` ตรง ๆ)
+- **Audit log** (`/admin/audit`, `GET /admin/audit-logs`): กรอง action / ผู้กระทำ / ช่วงวันที่ (เวลา Asia/Bangkok) · `format=csv` ส่งออกสูงสุด 50,000 แถว (UTF-8 + BOM, กัน formula injection ด้วย `'` นำหน้า) · เฉพาะ workspace ของ Admin · ตารางเป็น append-only ใน DB
+- **ตั้งค่า** (`/admin/settings`): ชื่อ workspace + ค่าเริ่มต้นสิทธิ์ (D15, มีผลกับของใหม่เท่านั้น) · ภาษาและข้อจำกัดระบบอ่านอย่างเดียว · audit `workspace.settings_changed` (ไม่บันทึกถ้าไม่เปลี่ยน) · ส่วน "วิธีเข้าสู่ระบบ" ของเฟส 2 ยังไม่มี
+- **Backup/ปฏิบัติการ**: `scripts/backup.sh` (pg_dump + restic + นโยบาย 7/4/6), `scripts/restore-test.sh` (กู้ลง DB ชั่วคราว ICU th-TH ตรวจแถว/ค้นไทย/append-only แล้วลบทิ้ง — ทดสอบจริงแล้ว), `scripts/reset-password.ts` (ทางหนีไฟ — ทดสอบจริงแล้ว) และ `docs/runbook.md` · **ยังไม่เคยรัน restic และ docker compose บนเซิร์ฟเวอร์จริง** (ไม่มี restic ในเครื่อง dev) ต้องรันครั้งแรกด้วยมือตาม runbook §2.3
+- ระวังตอนเขียนสคริปต์ bash: `cmd | grep -q` + `set -o pipefail` ให้ผลเท็จ (grep ปิด pipe เร็ว) — เก็บผลลัพธ์ก่อนแล้วค่อย grep (เจอจริงใน restore-test.sh)
+
 ## ช่องว่างที่รู้อยู่แล้ว (ทำตอนถึงสัปดาห์ที่เกี่ยวข้อง)
 
 - dialog ย้ายรายการเตือนแบบรวม ๆ ยังไม่แยกกรณี "สิทธิ์เปิดกว้างขึ้น" (design §4.4.4)
-- ลบรายการ = soft delete เท่านั้น ยังไม่มีหน้าถังขยะ/กู้คืน (สัปดาห์ 7)
-- ยังไม่มี endpoint `/me`, `/auth/methods`, `/trash`, admin `private-items`/`audit-logs`/`settings`/transfer
-- ตรรกะ `canTransfer` มีและทดสอบแล้ว แต่ยังไม่มี endpoint/หน้าจอ (TransferDialog ออกแบบไว้แล้วในแคนวาส)
+- ยังไม่มีการเลือกลบหลายรายการ/ล้างถังขยะทั้งหมดในครั้งเดียว
+- ยังไม่มี endpoint `/me`, `/auth/methods`
 - แอปตั้ง `X-Frame-Options` ฯลฯ เบื้องต้นใน `next.config.ts`; CSP แบบ strict ยังไม่ได้ใส่
 - Dockerfile/compose ผ่านการเขียนแล้วแต่ **ยังไม่เคย build จริง** (service `migrate` ใช้ stage `build`); backup (restic) อยู่สัปดาห์ 7
 

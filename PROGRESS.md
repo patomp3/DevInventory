@@ -1,4 +1,4 @@
-# PROGRESS — Dev Inventory (สัปดาห์ 4 + D22 เมื่อ 2026-11-05 · สัปดาห์ 5–6 เมื่อ 2026-11-06)
+# PROGRESS — Dev Inventory (สัปดาห์ 4 + D22 เมื่อ 2026-11-05 · สัปดาห์ 5–7 เมื่อ 2026-11-06)
 
 > **อัปเดตล่าสุด (D22):** ผู้ใช้ตัดสินให้รายการทุกชิ้นเป็น "Note" ชนิดเดียว เนื้อหาเป็น Markdown ทั้งหมด และเลือก "ป้าย" note/snippet/script/link ได้หลายป้าย ส่วน Snippet/Script แบบหลายไฟล์, ฟอร์ม Script และช่อง URL ที่ทำในสัปดาห์ 4 **ถูกถอดออกแล้ว** (ข้อมูลเดิมแปลงเป็น Markdown) — ส่วนด้านล่างที่พูดถึง code block / script_meta เป็นประวัติก่อน D22
 
@@ -10,6 +10,15 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 แหล่งความจริงหลัก: `docs/design.md` (v1.3) และ `docs/ui-design.md` (v1.4) · กฎการทำงานอยู่ใน `CLAUDE.md`
 
 ## สิ่งที่ทำไปแล้ว (Progress / Completed)
+
+**สัปดาห์ 7 (2026-11-06) — ถังขยะ, หน้า Admin, backup/runbook**
+- ถังขยะ: `src/lib/trash.ts`, API `GET /trash` / `POST /items/:id/restore` / `DELETE /trash/:id`, หน้า `/trash` (กู้คืน / ลบถาวรพร้อม dialog ยืนยัน, "เหลืออีก N วัน") · สิทธิ์ `canManageTrashed` + `trashedItemsWhere` ใน `permissions/` (เจ้าของของตัวเอง, Admin เฉพาะที่ไม่ใช่ private) · กู้ → Collection เดิม หรือ Inbox ถ้า Collection ถูกลบ · ลบถาวรลบแถวไฟล์แนบ + ไฟล์จริง + audit `item.purged`
+- งานรายคืน `npm run job:purge` + compose service `purge` (รายการ/ไฟล์แนบเกิน 30 วัน, audit reason = retention) — e2e รันจริงและพิสูจน์ว่าลบเฉพาะที่เกิน 30 วัน พร้อมไฟล์บนดิสก์
+- Admin: `/admin/private-items` (metadata เท่านั้น + `TransferDialog` เฉพาะเจ้าของที่ปิดบัญชี, D6), `/admin/audit` (กรอง action/ผู้กระทำ/ช่วงวันที่ + Export CSV กัน formula injection), `/admin/settings` (ชื่อ + ค่าเริ่มต้นสิทธิ์ D15 + ข้อจำกัดอ่านอย่างเดียว) + เมนูใน sidebar · `adminRoute` helper ใน `api.ts` · `ConfirmDialog` ใน `ui.tsx`
+- Operations: `scripts/backup.sh` (pg_dump + restic 7/4/6), `scripts/restore-test.sh`, `scripts/reset-password.ts` (`npm run user:reset-password`), `docs/runbook.md`, ลิงก์ใน README
+- ทดสอบ: unit 120/120 (เพิ่ม canManageTrashed, audit-format), `e2e-items.sh` **264/264** (เพิ่มถังขยะ 38 + Admin 63 เช็ก รวมปิดบัญชีเจ้าของจริงแล้วโอน), ข้าม workspace 22/22 ระดับ service (ถังขยะ/รายการส่วนตัว/โอน/audit/ตั้งค่า), typecheck + build ผ่าน, ตรวจในเบราว์เซอร์ (รายการส่วนตัว, Audit log, ตั้งค่า, ถังขยะ + dialog ลบถาวร) · `restore-test.sh` กู้ dump จริงของ dev DB ได้ครบ (26 workspace/179 รายการ/722 audit) และ `reset-password` ทดสอบจริงกับผู้ใช้ทิ้งได้
+- **ยังไม่ได้ทดสอบ:** `backup.sh` ขั้น restic (ไม่มี restic ในเครื่อง dev) และ docker compose บนเซิร์ฟเวอร์จริง (service `purge`, `docker compose run migrate npm run …`) — runbook ระบุให้รันครั้งแรกด้วยมือและตรวจผล
+- บั๊กที่เจอเองระหว่างทาง: `grep -q` + `set -o pipefail` ทำให้เงื่อนไขใน restore-test.sh ผิด (แก้แล้ว)
 
 **สัปดาห์ 6 (2026-11-06) — ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet**
 - `src/lib/search/query.ts`: `searchItems` (ผล 20/หน้า + total + facet ป้าย/tag/ภาษา + "คุณหมายถึง…") และ `quickSearch` · `visibleItemsWhere` ใน WHERE ของทุก query (ผล, total, facet, คำแนะนำ, quick) · ไวยากรณ์ `tag: kind:/type: lang: in: owner:me is:private "วลี" -คำ` + ตัวกรองจาก UI รวมเป็นไวยากรณ์เดียว (`mergeQuery`)
@@ -109,7 +118,7 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 2. (เสร็จ 2026-11-06) สัปดาห์ 5: ไฟล์แนบ, History + กู้เวอร์ชัน, dialog 409
 3. ปรับ `scripts/e2e-auth.sh` ให้รับ `ADMIN_EMAIL`/`PY` แบบเดียวกับ e2e-items.sh แล้วรันบน workspace ทดสอบ
 4. ไล่ตรวจหน้าจอสัปดาห์ 2–3 ในเบราว์เซอร์เทียบ ui-design
-2b. (เสร็จ 2026-11-06) สัปดาห์ 6 ค้นหา — **ถัดไป = สัปดาห์ 7**: ถังขยะ (restore/purge รวมลบไฟล์แนบจริงบนดิสก์), Admin › รายการส่วนตัว/audit log/ตั้งค่า + TransferDialog, backup (restic) — เดิมของข้อ 2b: หน้าค้นหาเต็มรูปแบบ (แทนหน้า `/tags/[slug]` ด้วย `tag:`), Ctrl+K, facet ตามป้าย, `kind:` (index `items_kinds`), `lang:` หาจาก code fence ใน body
+2b. (เสร็จ 2026-11-06) สัปดาห์ 7 — **ถัดไป = สัปดาห์ 8**: ทดสอบตาม DoD (design §16.4), รันจริงบน docker compose/Caddy, backup restic รอบแรก, แก้บั๊ก, เอกสาร, deploy · (เสร็จแล้ว) สัปดาห์ 6 ค้นหา — เดิมของข้อนี้ (สัปดาห์ 7): ถังขยะ (restore/purge รวมลบไฟล์แนบจริงบนดิสก์), Admin › รายการส่วนตัว/audit log/ตั้งค่า + TransferDialog, backup (restic) — เดิมของข้อ 2b: หน้าค้นหาเต็มรูปแบบ (แทนหน้า `/tags/[slug]` ด้วย `tag:`), Ctrl+K, facet ตามป้าย, `kind:` (index `items_kinds`), `lang:` หาจาก code fence ใน body
 6. ตอนใส่ CSP strict: จัดการ inline style ของ Shiki/CodeMirror
 
 ## Context สำคัญอื่นๆ (Notes)

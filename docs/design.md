@@ -602,7 +602,8 @@ UI เมื่อได้ 409: แจ้งว่า "มีคนแก้ร
 ### 10.3 ถังขยะ
 - ลบ = ตั้งค่า `deleted_at`, `deleted_by` การลบ Collection จะลบรายการข้างในแบบ soft delete ไปด้วย
 - หน้าถังขยะ: เจ้าของเห็นของตัวเอง Admin เห็นของทุกคนเฉพาะที่ไม่ใช่รายการส่วนตัว
-- งานทุกคืนจะลบถาวรรายการที่ `deleted_at` เกิน 30 วัน รวมไฟล์จริงด้วย และบันทึก audit log
+- งานทุกคืนจะลบถาวรรายการที่ `deleted_at` เกิน 30 วัน รวมไฟล์จริงด้วย และบันทึก audit log (`scripts/purge-trash.ts`, compose service `purge`)
+- กู้คืน: กลับ Collection เดิม ถ้า Collection ถูกลบแล้วกลับ Inbox (`inherit` → ค่า default ของ Workspace) · ลบถาวรด้วยมือต้องยืนยันก่อน
 
 ---
 
@@ -758,7 +759,7 @@ volumes: { files: {}, pgdata: {}, caddy: {} }
 ### 15.2 Backup
 - `pg_dump` ทุกคืน + restic backup volume ไฟล์ ไปเก็บที่ disk อื่น / NAS / object storage
 - เก็บรายวัน 7 ชุด รายสัปดาห์ 4 ชุด รายเดือน 6 ชุด
-- **ทดสอบ restore ทุกเดือน** (มีขั้นตอนเขียนไว้ใน runbook)
+- **ทดสอบ restore ทุกเดือน** (`scripts/backup.sh`, `scripts/restore-test.sh` และขั้นตอนใน `docs/runbook.md`)
 
 ### 15.3 Monitoring (ขั้นพื้นฐาน)
 - `/api/health` (ตรวจการเชื่อมต่อ DB และ storage) ใช้กับ Uptime Kuma (open source)
