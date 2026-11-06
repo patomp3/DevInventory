@@ -18,7 +18,8 @@ export type SessionUser = {
 
 /** อ่าน session แล้วตรวจสถานะผู้ใช้จาก DB ทุกครั้ง (ผู้ใช้ที่ถูกปิดบัญชีใช้งานต่อไม่ได้ทันที) */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
-  const s = await getAuth().api.getSession({ headers: await headers() });
+  const h = await headers(); // เรียกก่อน getAuth(): ให้ Next รู้ว่าเป็น dynamic ก่อนที่จะอ่าน env (ตอน build ไม่มี env)
+  const s = await getAuth().api.getSession({ headers: h });
   if (!s) return null;
   const [u] = await db().select().from(users).where(eq(users.id, s.user.id)).limit(1);
   if (!u || u.status !== "active" || !u.workspaceId) return null;

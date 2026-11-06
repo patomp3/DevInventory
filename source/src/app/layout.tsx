@@ -12,6 +12,9 @@ import "./globals.css";
 
 export const metadata: Metadata = { title: "Dev Inventory" };
 
+// ทั้งแอปเป็น dynamic: ไม่ prerender ตอน build (ตอน build ใน Docker ไม่มี .env/ฐานข้อมูล) และทุกหน้าต้องได้ nonce ของ CSP ต่อ request (src/middleware.ts)
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="th">
