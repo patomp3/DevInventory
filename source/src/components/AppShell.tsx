@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CollectionTree } from "@/components/CollectionTree";
+import { SearchButton } from "@/components/CommandPalette";
 import { NewCollectionButton } from "@/components/CollectionDialog";
 import type { TreeNode } from "@/lib/collections";
 
-type U = { displayName: string; email: string; role: "admin" | "member" };
+type U = { id: string; displayName: string; email: string; role: "admin" | "member" };
 
 export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; children: React.ReactNode }) {
   const path = usePathname();
@@ -33,6 +34,7 @@ export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; 
           {item("/", "หน้าแรก")}
           {item("/inbox", "Inbox")}
           {item("/mine", "ของฉัน")}
+          {item("/search", "ค้นหา")}
           {user.role === "admin" && (
             <>
               <p className="px-3 pb-1 pt-4 text-[13px] font-semibold text-muted">ผู้ดูแลระบบ</p>
@@ -52,7 +54,10 @@ export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; 
             <div className="text-text-2">{user.displayName}</div>
             <div className="text-muted">{user.email}</div>
           </div>
-          <Link href="/new" className="mr-auto rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:brightness-110">+ สร้างใหม่</Link>
+          <div className="mr-auto flex flex-wrap items-center gap-3">
+            <Link href="/new" className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:brightness-110">+ สร้างใหม่</Link>
+            <SearchButton userKey={user.id} />
+          </div>
           <Link href="/change-password" className="rounded-lg px-3 py-2 text-xs text-muted hover:bg-surface-hover">เปลี่ยนรหัสผ่าน</Link>
           <button onClick={logout} className="rounded-lg border border-[var(--border-strong)] px-3 py-2 text-xs text-text-2 hover:bg-surface-hover">ออกจากระบบ</button>
         </header>

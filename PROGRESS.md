@@ -1,4 +1,4 @@
-# PROGRESS — Dev Inventory (สัปดาห์ 4 + D22 เมื่อ 2026-11-05 · สัปดาห์ 5 เมื่อ 2026-11-06)
+# PROGRESS — Dev Inventory (สัปดาห์ 4 + D22 เมื่อ 2026-11-05 · สัปดาห์ 5–6 เมื่อ 2026-11-06)
 
 > **อัปเดตล่าสุด (D22):** ผู้ใช้ตัดสินให้รายการทุกชิ้นเป็น "Note" ชนิดเดียว เนื้อหาเป็น Markdown ทั้งหมด และเลือก "ป้าย" note/snippet/script/link ได้หลายป้าย ส่วน Snippet/Script แบบหลายไฟล์, ฟอร์ม Script และช่อง URL ที่ทำในสัปดาห์ 4 **ถูกถอดออกแล้ว** (ข้อมูลเดิมแปลงเป็น Markdown) — ส่วนด้านล่างที่พูดถึง code block / script_meta เป็นประวัติก่อน D22
 
@@ -11,6 +11,14 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 
 ## สิ่งที่ทำไปแล้ว (Progress / Completed)
 
+**สัปดาห์ 6 (2026-11-06) — ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet**
+- `src/lib/search/query.ts`: `searchItems` (ผล 20/หน้า + total + facet ป้าย/tag/ภาษา + "คุณหมายถึง…") และ `quickSearch` · `visibleItemsWhere` ใน WHERE ของทุก query (ผล, total, facet, คำแนะนำ, quick) · ไวยากรณ์ `tag: kind:/type: lang: in: owner:me is:private "วลี" -คำ` + ตัวกรองจาก UI รวมเป็นไวยากรณ์เดียว (`mergeQuery`)
+- `src/lib/search/snippet.ts` (pure): ไฮไลต์ + ข้อความตัวอย่าง ±80 ตัวอักษร, บรรทัดใน code fence พร้อมเลขบรรทัดภายใน block, เน้นทั้ง identifier เมื่อค้นหลายคำ (`user by id` → `getUserById`) · ส่งเป็นส่วน `{t, m}` ไม่ใช่ HTML
+- API: `GET /api/v1/search`, `GET /api/v1/search/quick` · UI: หน้า `/search` (ป้ายพร้อมจำนวน, Tag, ภาษา, กล่องไวยากรณ์, แบ่งหน้า), `CommandPalette` (cmdk: Ctrl/⌘+K, debounce 150 ms, เปิดล่าสุด 5 รายการใน localStorage ตาม user id, Enter/Ctrl+Enter) ปุ่มค้นหาที่แถบบน, เมนู "ค้นหา" ใน sidebar · `/tags/:slug` redirect ไป `/search?tag=`
+- **วัดความเร็วที่ 50,000 รายการ (ICU th-TH):** ค้นทั่วไป 3–55 ms, ไม่พบ+คำแนะนำ 135 ms, quick 116 ms, กรณีสุดโต่ง (คำที่อยู่ในทุกแถว) 279 ms — ผ่านเป้า < 300 ms · รอบแรกวัดได้ 868 ms เพราะ `word_similarity` (≈ 390 ms เฉพาะของ `search_text`) จึง **เปลี่ยนสูตรคะแนนจากสเปกเดิม** เป็นชื่อตรง + tag + สัดส่วนที่คำค้นครอบคลุมชื่อ แล้วอัปเดต design §8.4/§8.5 (**ผู้ใช้ควรทราบ/ยืนยัน**)
+- ทดสอบ: unit 105/105 (เพิ่ม snippet, mergeQuery), `e2e-items.sh` 163/163 (เพิ่มค้นหา 50 เช็ก: สิทธิ์/ไทย/identifier/วลี/ตัวกรอง/facet/คำแนะนำ/quick), ข้าม workspace 7/7 ระดับ service, typecheck + build ผ่าน, ตรวจในเบราว์เซอร์ (ค้นไทยกลางคำ, ไฮไลต์, facet, Ctrl+K → Enter → เปิดล่าสุด) · แก้ UX: เลือกแถวแรกของ palette ทุกครั้งที่ผลเปลี่ยน
+- ข้อควรระวัง: ชื่อภาษาหลัง ``` ไม่อยู่ใน `search_text` (ใช้ `lang:python` ไม่ใช่คำว่า python)
+
 **สัปดาห์ 5 (2026-11-06) — ไฟล์แนบ, History + กู้เวอร์ชัน, dialog 409**
 - ไฟล์แนบใต้ Note: `src/lib/attachments.ts` + `attachment-meta.ts`, API `POST/GET /items/:id/attachments`, `GET /attachments/:id/download`, `DELETE /attachments/:id` · เก็บที่ `FILES_DIR/{workspace}/{uuid}` · ตรวจ MIME จากเนื้อไฟล์ (magic bytes), รูปแรสเตอร์ inline / อย่างอื่นบังคับดาวน์โหลด, ≤ 50 MB, ≤ 50 ไฟล์/รายการ · สิทธิ์ผ่านรายการแม่ (ไม่มีสิทธิ์ = 404) · soft delete · `search_text` รวมชื่อไฟล์ · audit
 - UI: `AttachmentPanel` (Dropzone ในคอลัมน์ขวาของ Editor; รายการใหม่เก็บไฟล์ไว้ก่อนแล้วอัปโหลดหลังบันทึก; ปุ่ม "ลิงก์" คัดลอก Markdown) และ `AttachmentList` ในหน้า Detail (รูปแสดงตัวอย่าง)
@@ -18,7 +26,7 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 - Dialog 409 แบบ 3 ทาง (`ConflictDialog`) พร้อม diff ย่อ, คนแก้ล่าสุด/เวลา · `updateItem` ส่ง `current` ครบ (tags, editedBy, editedAt)
 - ทดสอบ: unit 80/80, `e2e-items.sh` 113/113 (เพิ่มไฟล์แนบ 33 เช็ก + History 25 เช็ก), เทสต์ข้าม workspace ของไฟล์แนบ 9/9 ระดับ service (สคริปต์ชั่วคราว), typecheck + `npm run build` ผ่าน, ตรวจในเบราว์เซอร์ (อัปโหลดรูปชื่อไทย, dialog 409 ทางที่ 1, History ของรายการที่ snapshot เก่า)
 - เปลี่ยนค่าในเครื่อง: `.env` → `FILES_DIR=./data/files` (ไม่ commit) ; `.gitignore` เพิ่ม `data/`
-- เอกสาร: CLAUDE.md (สถานะ + หัวข้อสัปดาห์ 5), design §10.1 (กู้ไม่ merge), ui-design (dialog 409 กว้าง 720 — **ต่างจากสเปกเดิม 560 เล็กน้อย รอผู้ใช้ยืนยัน**)
+- เอกสาร: CLAUDE.md (สถานะ + หัวข้อสัปดาห์ 5), design §10.1 (กู้ไม่ merge), ui-design (dialog 409 กว้าง 720 — ผู้ใช้ยืนยันให้คงไว้)
 
 **D22 — Note ชนิดเดียว + ป้าย (ทำหลังสัปดาห์ 4 ในวันเดียวกัน)**
 - `source/drizzle/0003_note_kinds.sql` (รันแล้ว): เพิ่ม `items.kinds text[]` (CHECK ⊆ note/snippet/script/link, ≥ 1) + GIN index `items_kinds`; แปลงข้อมูลเก่าเป็น Markdown ใน `body` (URL → `<url>`, script_meta → หัวข้อ "วิธีรัน" + ตาราง parameter, code blocks → `**ชื่อไฟล์**` + code fence) แล้วลบ `items.type/url/script_meta`, ตาราง `item_code_blocks`, enum `item_type` · สำรอง DB ก่อนรันไว้ที่ `before-0003.dump` (scratchpad)
@@ -90,7 +98,6 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 - CSP แบบ strict ยังไม่ได้ใส่: Shiki ใช้ `style` inline และ CodeMirror inject `<style>` → ตอนใส่ CSP ต้องอนุญาต `style-src 'unsafe-inline'` หรือใช้ `EditorView.cspNonce`/class
 - ยังไม่มี "กำลังแก้ไขโดย …" (heartbeat) ตาม design §10.2; purge ไฟล์แนบจริงจากดิสก์ยังไม่มี (ทำพร้อมถังขยะ สัปดาห์ 7)
 - ข้อมูลทดสอบค้างใน dev DB: workspace "W4 test" (3 ผู้ใช้) และ workspace `e2e-*` หลายชุด — ลบไม่ได้ง่ายเพราะ `audit_logs` เป็น append-only (FK) ถ้าต้องการสะอาดให้ `docker compose … down -v` แล้ว migrate/seed ใหม่
-- ui-design ระบุ dialog 409 กว้าง 560 แต่ทำ 720 (diff แคบเกิน) — รอยืนยัน/ปรับเอกสาร
 - หน้า Login/Admin/Collection ของสัปดาห์ 2–3 ยังไม่ได้ไล่ตรวจด้วยตาเทียบ ui-design
 - ข้อจำกัดเครื่อง Windows: Git Bash ทำ argv ภาษาไทยเพี้ยน และ Python อ่าน stdin ไม่ใช่ UTF-8 (แก้ใน e2e-items.sh แล้ว; e2e-auth.sh ยังไม่ได้ปรับ `PY`/อีเมล)
 
@@ -102,7 +109,7 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 2. (เสร็จ 2026-11-06) สัปดาห์ 5: ไฟล์แนบ, History + กู้เวอร์ชัน, dialog 409
 3. ปรับ `scripts/e2e-auth.sh` ให้รับ `ADMIN_EMAIL`/`PY` แบบเดียวกับ e2e-items.sh แล้วรันบน workspace ทดสอบ
 4. ไล่ตรวจหน้าจอสัปดาห์ 2–3 ในเบราว์เซอร์เทียบ ui-design
-2b. **ถัดไป = สัปดาห์ 6**: หน้าค้นหาเต็มรูปแบบ (แทนหน้า `/tags/[slug]` ด้วย `tag:`), Ctrl+K, facet ตามป้าย, `kind:` (index `items_kinds`), `lang:` หาจาก code fence ใน body
+2b. (เสร็จ 2026-11-06) สัปดาห์ 6 ค้นหา — **ถัดไป = สัปดาห์ 7**: ถังขยะ (restore/purge รวมลบไฟล์แนบจริงบนดิสก์), Admin › รายการส่วนตัว/audit log/ตั้งค่า + TransferDialog, backup (restic) — เดิมของข้อ 2b: หน้าค้นหาเต็มรูปแบบ (แทนหน้า `/tags/[slug]` ด้วย `tag:`), Ctrl+K, facet ตามป้าย, `kind:` (index `items_kinds`), `lang:` หาจาก code fence ใน body
 6. ตอนใส่ CSP strict: จัดการ inline style ของ Shiki/CodeMirror
 
 ## Context สำคัญอื่นๆ (Notes)

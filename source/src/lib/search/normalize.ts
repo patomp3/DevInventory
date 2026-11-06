@@ -80,7 +80,7 @@ export function parseQuery(raw: string): ParsedQuery {
     terms: [], phrases: [], excluded: [], tags: [], types: [], langs: [],
     collections: [], ownerMe: false, isPrivate: false,
   };
-  const re = /(-?)(?:(tag|type|lang|in|owner|is):)?(?:"([^"]*)"|(\S+))/g;
+  const re = /(-?)(?:(tag|type|kind|lang|in|owner|is):)?(?:"([^"]*)"|(\S+))/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(raw)) !== null) {
     const neg = m[1] === "-";
@@ -88,7 +88,7 @@ export function parseQuery(raw: string): ParsedQuery {
     const value = normalize(m[3] ?? m[4] ?? "");
     if (!value) continue;
     if (key === "tag") q.tags.push(value);
-    else if (key === "type") q.types.push(value);
+    else if (key === "type" || key === "kind") q.types.push(value); // kind: = ชื่อใหม่ของ type: (D22)
     else if (key === "lang") q.langs.push(value);
     else if (key === "in") q.collections.push(value);
     else if (key === "owner") { if (value === "me") q.ownerMe = true; }

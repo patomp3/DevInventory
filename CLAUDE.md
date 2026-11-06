@@ -24,8 +24,8 @@ Next.js 15 App Router (TypeScript, webpack) · Drizzle ORM + `pg` · PostgreSQL 
 | 3 | Collection tree + สืบทอดสิทธิ์, Note/Link CRUD, versions, 409, UI หลัก | เสร็จ |
 | 4 | Editor Markdown + code fence (Shiki, Copy), ป้าย kinds (D22), tag | เสร็จ (ตรวจในเบราว์เซอร์แล้ว: สร้าง/แก้ Note หลายป้าย, code fence highlight + Copy, รายการที่แปลงจากข้อมูลเก่า) |
 | 5 | ไฟล์แนบใต้ Note, หน้า History + diff + กู้เวอร์ชัน, dialog 409 แบบ 3 ทาง | เสร็จ (e2e 113/113 + ตรวจในเบราว์เซอร์: อัปโหลดรูปชื่อไทย, dialog 409, History ของ snapshot เก่า) |
-| 6 | ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet | **ถัดไป** |
-| 7 | ถังขยะ, Admin › รายการส่วนตัว/audit log/ตั้งค่า, backup | |
+| 6 | ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet | เสร็จ (e2e 163/163, วัดที่ 50,000 รายการ: ค้นทั่วไป 3–55 ms / กรณีสุดโต่ง 279 ms, ตรวจในเบราว์เซอร์) |
+| 7 | ถังขยะ, Admin › รายการส่วนตัว/audit log/ตั้งค่า, backup | **ถัดไป** |
 | 8 | ทดสอบตาม DoD, แก้บั๊ก, เอกสาร, deploy | |
 
 เลื่อนไปเฟส 2 (อย่าทำตอนนี้): Google login, share รายบุคคล/กลุ่ม, access requests, pin, notifications, หน้า "บัญชีของฉัน", mobile, light mode
@@ -41,13 +41,14 @@ src/lib/item-content.ts pure: KINDS/KIND_LABEL, normalizeKinds, prepareContent, 
 src/lib/item-schema.ts zod body ของ POST/PUT items  ·  src/lib/tags.ts  replaceItemTags, tagsForItems, listTags (ผ่าน visibleItemsWhere)
 src/lib/attachments.ts ไฟล์แนบ: upload/list/download/delete (สิทธิ์ผ่านรายการแม่ + soft delete) · src/lib/attachment-meta.ts pure: sniffMime (magic bytes), cleanFilename, contentDisposition, ขีดจำกัด
 src/lib/versions.ts    listVersions / getVersionWithPrev / restoreVersion (กู้ = เวอร์ชันใหม่ ไม่ merge) · src/lib/item-history.ts pure: snapshotToView (รองรับ snapshot เก่า+ใหม่), sideBySide (diff), changedFields
+src/lib/search/query.ts  searchItems (ผล+total+facet+คำแนะนำ) / quickSearch — ทุก query ผ่าน visibleItemsWhere ใน SQL · src/lib/search/snippet.ts pure: highlight, bodyExcerpt, buildResultSnippet
 src/lib/highlight.ts   Shiki highlighter ตัวเดียว (JS regex engine, ธีมเองตาม ui-design §3.1) ใช้ผ่าน @shikijs/rehype ใน MarkdownView
 src/lib/auth/          Better Auth config (lazy), session helper, password policy
 src/lib/api.ts         userRoute()/requireAdmin() — ตรวจ Origin(CSRF) + session + แปลง AppError → HTTP
 src/lib/audit.ts       เขียน audit_logs   ·  src/lib/errors.ts  AppError, notFound
 src/lib/db/schema.ts   Drizzle schema (ต้องตรงกับ drizzle/*.sql)
-src/app/api/v1/…       REST: auth, admin/{users,invites}, collections, items (+ /attachments, /versions, /versions/:v/restore), attachments/:id (+ /download), tags
-src/components/        MarkdownView (server, MarkdownAsync: sanitize → Shiki) + CodePre (Copy), CodeEditor (CodeMirror 6 โหมด Markdown), TagInput, KindChips, ItemEditor (Editor เดียว), AttachmentPanel/AttachmentList, DiffView, ConflictDialog (409 แบบ 3 ทาง)
+src/app/api/v1/…       REST: auth, admin/{users,invites}, collections, search (+ /quick), items (+ /attachments, /versions, /versions/:v/restore), attachments/:id (+ /download), tags
+src/components/        MarkdownView (server, MarkdownAsync: sanitize → Shiki) + CodePre (Copy), CodeEditor (CodeMirror 6 โหมด Markdown), TagInput, KindChips, ItemEditor (Editor เดียว), AttachmentPanel/AttachmentList, DiffView, ConflictDialog (409 แบบ 3 ทาง), CommandPalette (Ctrl+K, cmdk) + RecentTracker, Marked (ไฮไลต์)
 src/app/(app)/…        หน้าหลังล็อกอิน (layout ตรวจ session + sidebar tree)
 drizzle/*.sql          migration แบบ SQL ล้วน รันด้วย scripts/migrate.ts ตามชื่อไฟล์
 scripts/               migrate, seed, doctor, poc-thai-search, e2e-auth.sh, e2e-items.sh
@@ -94,9 +95,9 @@ npm run dev                      # http://localhost:3000
 
 ## ทดสอบ
 
-- `npm test` (Vitest, 80 เคส: permission matrix, search, password policy, item-content (ป้าย/tag), attachment-meta, item-history (snapshot/diff)) · `npm run typecheck` · `npm run build`
+- `npm test` (Vitest, 105 เคส: permission matrix, search (normalize/parseQuery/query), snippet (ไฮไลต์), password policy, item-content, attachment-meta, item-history) · `npm run typecheck` · `npm run build`
 - e2e (ต้องมีเซิร์ฟเวอร์รันอยู่ + DB ที่ seed แล้ว + `psql`; เขียนเป็น bash — บน Windows ใช้ Git Bash/WSL): `scripts/e2e-auth.sh` (login lockout, เชิญ, รีเซ็ตรหัส, ปิดบัญชี) และ `scripts/e2e-items.sh` (สิทธิ์/สืบทอด/409/ความลึก + ป้าย/tag/Markdown) ตั้งตัวแปร env `B`, `PSQL`, `ADMIN_EMAIL`, `ADMIN_PW`, `MEMBER_EMAIL`, `PY` ให้ตรงกับเครื่อง — บนเครื่องนี้: `PY=python` (python3 เป็นแค่ stub ของ Store), `PSQL="docker exec -i source-db-1 psql -U inventory inventory"`, `B=http://localhost:3100`
-- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-06 หลังสัปดาห์ 5: 113/113 ผ่าน) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน · `curl -F file=@…` บน Windows อ่าน path แบบ `/tmp/…` ไม่ได้ ต้องใช้ `cygpath -m` (สคริปต์ทำให้แล้ว)
+- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-06 หลังสัปดาห์ 6: 163/163 ผ่าน) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน · `curl -F file=@…` บน Windows อ่าน path แบบ `/tmp/…` ไม่ได้ ต้องใช้ `cygpath -m` (สคริปต์ทำให้แล้ว)
 - เพิ่มเทสต์ทุกครั้งที่แตะ permission engine; ทุก endpoint ใหม่ต้องมีเคส "ไม่มีสิทธิ์ → 404" และ "ข้าม workspace"
 - ยังไม่มีเทส UI/Playwright (อยู่ในแผนสัปดาห์ 8) — หน้า Editor/Detail/หน้าแรก ตรวจในเบราว์เซอร์แล้ว แต่หน้า Login/Admin/Collection ของสัปดาห์ 2–3 ยังไม่ได้ไล่ดูละเอียดเทียบ ui-design
 - พอร์ต 3000 บนเครื่องนี้มีบริการอื่น (Gotenberg) จับอยู่ — `.claude/launch.json` รัน dev ที่ **3100**
@@ -124,11 +125,23 @@ npm run dev                      # http://localhost:3000
 - **409**: payload `current` = `{version,title,summary,body,kinds,tags,editedBy,editedAt}` · `ConflictDialog` (กว้าง 720 — สเปก ui-design ระบุ 560 แต่ diff แบบ 2 คอลัมน์แคบเกินไป) 3 ทาง: ใช้ของล่าสุดแล้วแก้ใหม่ / บันทึกทับ / คัดลอกของฉันเก็บไว้ก่อน
 - ยังไม่มี "กำลังแก้ไขโดย …" (heartbeat, design §10.2 ท้ายหัวข้อ — best-effort) และการรวมเวอร์ชันยังไม่มีนโยบายจำกัดจำนวน (เก็บทุกเวอร์ชัน)
 
+## สัปดาห์ 6 — ค้นหา — ข้อควรรู้
+
+- **API**: `GET /api/v1/search?q=&kind=&tag=&lang=&page=` (ผล 20/หน้า + `total` + `facets{kinds,tags,langs}` + `didYouMean`) และ `GET /api/v1/search/quick?q=` (ชื่อ/tag สูงสุด 8) · หน้า `/search` (`/tags/:slug` redirect มาที่นี่) · Ctrl/⌘+K เปิด palette จากทุกหน้า (Enter = เปิดรายการ, Ctrl+Enter = ผลค้นหาเต็ม)
+- **ไวยากรณ์**: คำ AND, `"วลี"`, `-คำ` (มีแต่ `-คำ` ก็ค้นได้), `tag:` `kind:`/`type:` `lang:` `in:"ชื่อ Collection"` (รวม sub-collection, นับเฉพาะ Collection ที่ผู้ถามเห็น) `owner:me` `is:private` · ตัวกรองจาก UI (`kind`/`tag`/`lang`) ถูกรวมเข้าไวยากรณ์เดียวกันใน `mergeQuery` · จำกัดคำค้น 200 ตัวอักษร / 12 คำ
+- **สิทธิ์**: `visibleItemsWhere` อยู่ใน WHERE ของ **ทุก** query (ผล, total, facet 3 ชนิด, คำแนะนำ, quick) · facet/total/ข้อความตัวอย่างจึงไม่รั่วรายการ private ของคนอื่นแม้เป็น Admin · breadcrumb ใช้ `canView` ของ Collection (หยุดที่ชั้นที่ไม่มีสิทธิ์เห็น)
+- **ภาษา (`lang:` และ facet)** หาจาก code fence ใน body (regex `` ```lang ``) ไม่ใช่ตาราง · ชื่อภาษาหลัง ``` **ไม่อยู่ใน `search_text`** (stripMarkdown ตัดทิ้ง) จึงค้นด้วยคำว่า "python" ไม่เจอเพียงเพราะเป็นภาษาของ block — ต้องใช้ `lang:python`
+- **คะแนน**: ชื่อมีคำแรก 10 + คำอื่นในชื่อ 3/คำ + tag ตรง 6 + summary ตรง 2 + 4×สัดส่วนที่คำค้นครอบคลุมชื่อ · **ห้ามกลับไปใช้ `word_similarity` กับ `search_text`/ชื่อ** (pg_trgm ภายใต้ ICU th-TH ช้า: 50,000 แถว ≈ 390 ms) — ดู design §8.4
+- **ไฮไลต์**: server ส่งส่วนข้อความ `{t, m}` ไม่ใช่ HTML (React escape ให้) · เลขบรรทัดคือบรรทัดภายใน code block
+- **คำแนะนำ "คุณหมายถึง…"** เมื่อไม่พบผล: tag (similarity > 0.2) + ชื่อรายการ (word_similarity > 0.3) เฉพาะที่ผู้ถามเห็น
+- **เปิดล่าสุด** ใน palette เก็บใน localStorage ของเบราว์เซอร์ คีย์ตาม user id (`di-recent:<userId>`) ไม่ขึ้น server — ใช้ได้โดยไม่มี localStorage
+- ทดสอบความเร็ว: สร้าง workspace ชั่วคราว + `generate_series` 50,000 แถว ใส่ ICU th-TH แล้วลบทิ้ง (สคริปต์ไม่อยู่ใน repo) ถ้าแก้ query ค้นหาให้วัดซ้ำด้วยคำที่ตรงทุกแถว (กรณีแย่สุด)
+
 ## ช่องว่างที่รู้อยู่แล้ว (ทำตอนถึงสัปดาห์ที่เกี่ยวข้อง)
 
 - dialog ย้ายรายการเตือนแบบรวม ๆ ยังไม่แยกกรณี "สิทธิ์เปิดกว้างขึ้น" (design §4.4.4)
 - ลบรายการ = soft delete เท่านั้น ยังไม่มีหน้าถังขยะ/กู้คืน (สัปดาห์ 7)
-- ยังไม่มี endpoint `/me`, `/auth/methods`, `/trash`, `/search`, admin `private-items`/`audit-logs`/`settings`/transfer
+- ยังไม่มี endpoint `/me`, `/auth/methods`, `/trash`, admin `private-items`/`audit-logs`/`settings`/transfer
 - ตรรกะ `canTransfer` มีและทดสอบแล้ว แต่ยังไม่มี endpoint/หน้าจอ (TransferDialog ออกแบบไว้แล้วในแคนวาส)
 - แอปตั้ง `X-Frame-Options` ฯลฯ เบื้องต้นใน `next.config.ts`; CSP แบบ strict ยังไม่ได้ใส่
 - Dockerfile/compose ผ่านการเขียนแล้วแต่ **ยังไม่เคย build จริง** (service `migrate` ใช้ stage `build`); backup (restic) อยู่สัปดาห์ 7

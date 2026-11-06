@@ -8,7 +8,7 @@ export function TagChips({ tags, link = true }: { tags: { name: string; slug: st
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Tag">
       {list.map((t) => (
-        <li key={t.slug}>{link ? <Link href={`/tags/${encodeURIComponent(t.slug)}`} className={`${cls} hover:text-text`}>#{t.name}</Link> : <span className={cls}>#{t.name}</span>}</li>
+        <li key={t.slug}>{link ? <Link href={`/search?tag=${encodeURIComponent(t.slug)}`} className={`${cls} hover:text-text`}>#{t.name}</Link> : <span className={cls}>#{t.name}</span>}</li>
       ))}
     </ul>
   );

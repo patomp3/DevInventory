@@ -34,7 +34,7 @@ export default async function Home() {
             <ul className="flex flex-wrap gap-1.5">
               {tags.map((t) => (
                 <li key={t.slug}>
-                  <Link href={`/tags/${encodeURIComponent(t.slug)}`} className="inline-flex items-center gap-1.5 rounded-md bg-surface-hover px-2 py-1 text-xs text-text-2 hover:text-text">
+                  <Link href={`/search?tag=${encodeURIComponent(t.slug)}`} className="inline-flex items-center gap-1.5 rounded-md bg-surface-hover px-2 py-1 text-xs text-text-2 hover:text-text">
                     #{t.name}<span className="font-mono text-[11px] text-muted">{t.count}</span>
                   </Link>
                 </li>

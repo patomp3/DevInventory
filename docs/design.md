@@ -1,6 +1,7 @@
 # Dev Inventory — System Design
 
 > สถานะ: Draft v1.3 · วันที่ 2026-11-05
+> v1.4 (สัปดาห์ 6): สูตรคะแนนค้นหาไม่ใช้ `word_similarity` ของเนื้อหา/ชื่อ (วัดแล้วช้า) ใช้ชื่อตรง + tag + สัดส่วนที่คำค้นครอบคลุมชื่อ (§8.4) · ไฮไลต์ส่งเป็นส่วนข้อความ ไม่ใช่ HTML (§8.5)
 > v1.3: **D22** รายการทุกชิ้นเป็น Note ชนิดเดียว เนื้อหาเป็น Markdown ทั้งหมด ประเภทเดิมกลายเป็น "ป้าย" (kinds) เลือกได้หลายป้าย ไฟล์แนบอยู่ใต้ Note (§3, §6, §8, §12, §13, §17)
 > v1.2: เพิ่ม dialog เชิญด้วยอีเมล / โอนความเป็นเจ้าของ ใน §13.1
 > v1.1: เพิ่มรายละเอียดหน้า Login / SetPassword / Admin (§13.1), ออกแบบรองรับ Login ด้วย Google ในเฟส 2 (§19, D16–D20) และเตรียมจุดเชื่อมไว้ในเฟส 1
@@ -513,11 +514,12 @@ search_text = normalize(
 ```sql
 WITH q AS (
   SELECT i.*,
-    ( CASE WHEN lower(i.title) LIKE :t1_like THEN 10 ELSE 0 END      -- ชื่อเรื่องตรง
+    ( 10 * (lower(i.title) LIKE :t1_like)::int                         -- ชื่อเรื่องมีคำแรก
+    + 3 * (ชื่อเรื่องมีคำอื่น ๆ — คำละ 3)
     + CASE WHEN EXISTS (SELECT 1 FROM item_tags it JOIN tags t ON t.id = it.tag_id
                         WHERE it.item_id = i.id AND t.slug = :t1) THEN 6 ELSE 0 END
-    + 4 * word_similarity(:query, lower(i.title))
-    + 1 * word_similarity(:query, i.search_text)
+    + CASE WHEN lower(i.summary) LIKE :t1_like THEN 2 ELSE 0 END
+    + 4 * least(1, :chars_of_terms / char_length(i.title))               -- สัดส่วนที่คำค้นครอบคลุมชื่อ
     ) AS score
   FROM items i
   WHERE <visibleItemsWhere(ctx)>                    -- 7.2
@@ -532,15 +534,16 @@ ORDER BY score DESC, updated_at DESC
 LIMIT 20 OFFSET :offset;
 ```
 
+- **ไม่ใช้ `word_similarity` ในสูตรคะแนน (วัดจริง 2026-11-06):** ทุกผลผ่าน `LIKE` ครบทุกคำอยู่แล้ว และ pg_trgm ภายใต้ ICU `th-TH` ช้า — ที่ 50,000 แถว `word_similarity` ของ `search_text` ≈ 390 ms และของชื่อ ≈ 150 ms จากทั้ง query ≈ 550 ms จึงใช้สัดส่วนที่คำค้นครอบคลุมชื่อแทน (ชื่อสั้นที่ตรงเต็มขึ้นก่อน) ผลวัดหลังแก้: ค้นทั่วไป 3–55 ms, คำที่อยู่ในทุกแถว 279 ms (เป้า p95 < 300 ms)
 - `total` คำนวณจาก query เดียวกัน **จึงนับเฉพาะรายการที่มีสิทธิ์** เท่านั้น
 - facet (จำนวนตามประเภท / tag) ใช้ CTE เดียวกันแล้ว `GROUP BY`
 - คำที่สั้นกว่า 3 ตัวอักษร: trigram index ช่วยไม่ได้ แต่ ILIKE ยังให้ผลถูกต้อง ที่ขนาดข้อมูลนี้ยังเร็วพอ
-- **ไม่พบผล:** ค้นสำรองด้วย `word_similarity(:query, title) > 0.3` และ tag ที่คล้ายกัน แล้วแสดงเป็น "คุณหมายถึง…"
+- **ไม่พบผล:** ค้นสำรองด้วย `word_similarity(:query, title) > 0.3` และ tag ที่คล้ายกัน (`similarity(slug, :query) > 0.2` — tag สั้น "dokcer" ↔ "docker" ได้ราว 0.27) แล้วแสดงเป็น "คุณหมายถึง…"
 
 ### 8.5 Highlight และข้อความตัวอย่าง
-- server เป็นคนสร้างข้อความตัวอย่าง: หาตำแหน่งแรกของคำค้นใน title / summary / body / code แล้วตัดมาประมาณ ±80 ตัวอักษร escape HTML ก่อน แล้วค่อยครอบด้วย `<mark>`
+- server เป็นคนสร้างข้อความตัวอย่าง: หาตำแหน่งแรกของคำค้นใน title / summary / body (รวมโค้ดใน code fence) แล้วตัดมาประมาณ ±80 ตัวอักษร **ส่งเป็นส่วนข้อความ `{t, m}` (m = ถูกเน้น) ไม่ใช่ HTML** — UI ครอบ `<mark>` เอง จึงไม่มีทางหลุด HTML จากเนื้อหาผู้ใช้
 - ข้อความตัวอย่างสร้าง **หลังจาก** ผ่าน predicate สิทธิ์แล้วเท่านั้น
-- ถ้าเจอใน code ให้แสดงบรรทัดนั้นพร้อมเลขบรรทัด
+- ถ้าเจอใน code fence ให้แสดงบรรทัดนั้นพร้อมเลขบรรทัด **ภายใน block** (เริ่มที่ 1 — โค้ดอยู่ใน Markdown ไม่มีไฟล์แยกแล้ว) และภาษาของ block · ค้นหลายคำ ("user by id") เน้นทั้ง identifier ที่แตกคำแล้วตรง (`getUserById`)
 
 ### 8.6 Quick search (Ctrl+K)
 - ใช้ `cmdk` เปิดได้จากทุกหน้า, debounce 150 ms, แสดง 8 รายการแรกจากชื่อเรื่องและ tag

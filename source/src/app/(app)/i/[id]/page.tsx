@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ItemActions } from "./ItemActions";
 import { AttachmentList } from "@/components/AttachmentList";
+import { RecentTracker } from "@/components/CommandPalette";
 import { KindChips } from "@/components/KindChips";
 import { MarkdownView } from "@/components/MarkdownView";
 import { TagChips } from "@/components/TagChips";
@@ -13,11 +14,12 @@ import { getItemDetail } from "@/lib/items";
 /** หน้ารายละเอียด (ui-design §7.4) — ทุกรายการเป็น Note: เนื้อหา Markdown (code fence มี highlight + Copy) */
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { ctx } = await requireCtx();
+  const { ctx, user } = await requireCtx();
   const item = await orNotFound(getItemDetail(ctx, id));
   const [targets, files] = await Promise.all([item.canManage ? listWritableCollections(ctx) : Promise.resolve([]), listAttachments(ctx, id)]);
   return (
     <article>
+      <RecentTracker userKey={user.id} id={id} title={item.title} />
       <nav aria-label="breadcrumb" className="mb-2 text-xs text-muted">
         {item.breadcrumb.length === 0 ? <Link href="/inbox" className="hover:text-text">Inbox</Link> : item.breadcrumb.map((b) => <span key={b.id}><Link href={`/c/${b.id}`} className="hover:text-text">{b.name}</Link> / </span>)}
       </nav>

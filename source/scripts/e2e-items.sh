@@ -208,5 +208,70 @@ chk hist-private-admin-restore-404 404 "$(code -b A.jar -X POST $B/api/v1/items/
 chk hist-private-owner-list-200 200 "$(code -b M.jar $B/api/v1/items/$S2/versions)"
 # 409 ต้องแนบสถานะล่าสุดพร้อม tag และคนแก้ล่าสุด (ใช้แสดง dialog 3 ทาง)
 chk conflict-payload-keys "body,editedAt,editedBy,kinds,summary,tags,title,version" "$(code_body() { curl -s -b M.jar -X PUT $B/api/v1/items/$S1 -H "$O" -H "$J" -d '{"version":1,"title":"x"}'; }; code_body | $PY -c "import sys,json; print(','.join(sorted(json.load(sys.stdin.buffer)['current'].keys())))")"
+# --- ค้นหา (สัปดาห์ 6): สิทธิ์ใน SQL, ไทย, identifier, วลี, ตัวกรอง, facet, คำแนะนำ, quick
+# ใช้คำเฉพาะ "xyzkb" กันปนกับรายการจากเคสก่อนหน้า; ข้อความไทยเป็น \uXXXX / %XX เหมือนส่วนอื่น
+KB=$(a -X POST $B/api/v1/collections -d '{"name":"kbcol","visibility":"workspace_view"}' | j "['id']")
+KP=$(a -X POST $B/api/v1/collections -d '{"name":"kbpriv","visibility":"private"}' | j "['id']")
+SA=$(a -X POST $B/api/v1/items -d "{\"title\":\"xyzkb \u0e04\u0e39\u0e48\u0e21\u0e37\u0e2d\u0e15\u0e34\u0e14\u0e15\u0e31\u0e49\u0e07\u0e23\u0e30\u0e1a\u0e1a\",\"kinds\":[\"snippet\"],\"collectionId\":\"$KB\",\"tags\":[\"Docker\",\"ops\"],\"body\":\"## setup\n\n\`\`\`bash\nsudo docker compose up -d\n\`\`\`\n\n\`\`\`js\nfunction getUserById(id) {}\n\`\`\`\"}" | j "['id']")
+SB=$(m -X POST $B/api/v1/items -d '{"title":"xyzkb backup nightly","kinds":["script"],"tags":["ops"],"visibility":"workspace_view","body":"```python\nimport os\nprint(1)\n```"}' | j "['id']")
+SP=$(m -X POST $B/api/v1/items -d '{"title":"xyzkb secret plan","kinds":["note"],"tags":["private-tag"],"visibility":"private","body":"secret docker plan xyzkb"}' | j "['id']")
+SD=$(m -X POST $B/api/v1/items -d '{"title":"xyzkb to delete","visibility":"workspace_view"}' | j "['id']")
+chk srch-fixture-delete-200 200 "$(code -b M.jar -X DELETE "$B/api/v1/items/$SD" -H "$O")"
+sa() { curl -s -b "$1" "$B/api/v1/search?$2"; }
+sq() { curl -s -b "$1" "$B/api/v1/search/quick?q=$2"; }
+chk srch-admin-total 2 "$(sa A.jar 'q=xyzkb' | j "['total']")"
+chk srch-owner-total 3 "$(sa M.jar 'q=xyzkb' | j "['total']")"
+chk srch-total-equals-hits 2 "$(sa A.jar 'q=xyzkb' | j "['hits'].__len__()")"
+chk srch-private-not-in-hits-admin 0 "$(sa A.jar 'q=xyzkb' | grep -c "$SP")"
+chk srch-deleted-hidden 0 "$(sa M.jar 'q=xyzkb' | grep -c "$SD")"
+chk srch-private-title-not-in-body-admin 0 "$(sa A.jar 'q=secret+plan' | j "['total']")"
+chk srch-private-owner-finds 1 "$(sa M.jar 'q=secret+plan' | j "['total']")"
+# facet ต้องไม่รั่ว tag / ภาษา / จำนวนของรายการที่มองไม่เห็น
+chk srch-facet-tag-admin-no-private-tag 0 "$(sa A.jar 'q=xyzkb' | grep -c 'private-tag')"
+chk srch-facet-tag-owner-has-private-tag 1 "$(sa M.jar 'q=xyzkb' | grep -c 'private-tag')"
+chk srch-facet-kind-admin "[('note', 0), ('script', 1), ('snippet', 1)]" "$(sa A.jar 'q=xyzkb' | $PY -c "import sys,json; d=json.load(sys.stdin.buffer)['facets']['kinds']; k={x['value']:x['count'] for x in d}; print([(n,k.get(n,0)) for n in ('note','script','snippet')])")"
+chk srch-facet-kind-owner-note-1 1 "$(sa M.jar 'q=xyzkb' | $PY -c "import sys,json; d=json.load(sys.stdin.buffer)['facets']['kinds']; print({x['value']:x['count'] for x in d}.get('note',0))")"
+chk srch-facet-lang-admin "bash js python" "$(sa A.jar 'q=xyzkb' | $PY -c "import sys,json; print(' '.join(sorted(x['value'] for x in json.load(sys.stdin.buffer)['facets']['langs'])))")"
+# ภาษาไทยไม่มีช่องว่าง (ค้นกลางคำ) + ชื่อใน code (identifier) + วลี
+chk srch-thai-substring 1 "$(sa A.jar 'q=%E0%B8%95%E0%B8%B4%E0%B8%94%E0%B8%95%E0%B8%B1%E0%B9%89%E0%B8%87+xyzkb' | j "['total']")"
+chk srch-identifier-words 1 "$(sa A.jar 'q=user+by+id+xyzkb' | j "['total']")"
+chk srch-identifier-excerpt code "$(sa A.jar 'q=user+by+id+xyzkb' | j "['hits'][0]['snippet']['excerpt']['kind']")"
+chk srch-phrase 1 "$(sa A.jar 'q=%22up+-d%22+xyzkb' | j "['total']")"
+chk srch-and-terms 1 "$(sa A.jar 'q=docker+compose+xyzkb' | j "['total']")"
+chk srch-exclude 1 "$(sa A.jar 'q=xyzkb+-print' | j "['total']")"
+chk srch-code-line-number 1 "$(sa A.jar 'q=compose+xyzkb' | j "['hits'][0]['snippet']['excerpt']['line']")"
+# ตัวกรอง (ไวยากรณ์ + พารามิเตอร์จาก UI)
+chk srch-kind-script 1 "$(sa A.jar 'q=xyzkb&kind=script' | j "['total']")"
+chk srch-kind-syntax 1 "$(sa A.jar 'q=xyzkb+kind%3Asnippet' | j "['total']")"
+chk srch-type-alias 1 "$(sa A.jar 'q=xyzkb+type%3Ascript' | j "['total']")"
+chk srch-tag-ops 2 "$(sa A.jar 'q=xyzkb&tag=ops' | j "['total']")"
+chk srch-tag-docker 1 "$(sa A.jar 'q=xyzkb&tag=Docker' | j "['total']")"
+chk srch-lang-bash 1 "$(sa A.jar 'q=xyzkb&lang=bash' | j "['total']")"
+chk srch-lang-python 1 "$(sa A.jar 'q=xyzkb&lang=python' | j "['total']")"
+chk srch-lang-none 0 "$(sa A.jar 'q=xyzkb&lang=rust' | j "['total']")"
+chk srch-owner-me-admin 1 "$(sa A.jar 'q=xyzkb+owner%3Ame' | j "['total']")"
+chk srch-owner-me-member 2 "$(sa M.jar 'q=xyzkb+owner%3Ame' | j "['total']")"
+chk srch-is-private-owner 1 "$(sa M.jar 'q=xyzkb+is%3Aprivate' | j "['total']")"
+chk srch-is-private-admin 0 "$(sa A.jar 'q=xyzkb+is%3Aprivate' | j "['total']")"
+chk srch-in-collection 1 "$(sa A.jar 'q=xyzkb+in%3Akbcol' | j "['total']")"
+chk srch-in-collection-breadcrumb kbcol "$(sa M.jar 'q=xyzkb+in%3Akbcol' | j "['hits'][0]['breadcrumb'][0]['name']")"
+chk srch-in-private-collection-hidden 0 "$(sa M.jar 'q=in%3Akbpriv' | j "['total']")"
+chk srch-only-filter-no-terms 2 "$(sa A.jar 'tag=ops' | j "['total']")"
+# ไม่พบผล → "คุณหมายถึง" (เฉพาะ tag/ชื่อที่ผู้ถามเห็น)
+chk srch-did-you-mean-tag 1 "$(sa A.jar 'q=dokcer' | $PY -c "import sys,json; d=json.load(sys.stdin.buffer); print(int('tag:docker' in [x['q'] for x in d['didYouMean']]))")"
+chk srch-did-you-mean-no-private-leak 0 "$(sa A.jar 'q=privte-tag' | grep -c 'private-tag')"
+chk srch-no-term-empty 0 "$(sa A.jar 'q=' | j "['total']")"
+chk srch-unauth-401 401 "$(code "$B/api/v1/search?q=xyzkb")"
+chk srch-escape-chars-ok 200 "$(code -b A.jar "$B/api/v1/search?q=%25_%5C%27%22")"
+chk srch-long-query-ok 200 "$(code -b A.jar "$B/api/v1/search?q=$(head -c 3000 /dev/zero | tr '\0' a)")"
+chk srch-page-out-of-range 0 "$(sa A.jar 'q=xyzkb&page=99' | j "['hits'].__len__()")"
+# quick (Ctrl+K): ชื่อหรือ tag, สิทธิ์เหมือนกัน, สูงสุด 8
+chk quick-admin 2 "$(sq A.jar xyzkb | j "['items'].__len__()")"
+chk quick-owner 3 "$(sq M.jar xyzkb | j "['items'].__len__()")"
+chk quick-tag-match 2 "$(sq A.jar ops | j "['items'].__len__()")"
+chk quick-private-tag-admin 0 "$(sq A.jar private-tag | j "['items'].__len__()")"
+chk quick-empty 0 "$(sq A.jar '' | j "['items'].__len__()")"
+chk quick-breadcrumb kbcol "$(sq A.jar xyzkb | $PY -c "import sys,json; print([x['breadcrumb'] for x in json.load(sys.stdin.buffer)['items'] if x['breadcrumb']][0])")"
+chk quick-unauth-401 401 "$(code "$B/api/v1/search/quick?q=xyzkb")"
 # ผลรวม
 echo "passed=$pass failed=$failn"
