@@ -36,7 +36,7 @@ jobs:
       INITIAL_ADMIN_PASSWORD: ci-initial-admin-pass-1
       FILES_DIR: ./data/files
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: source/package-lock.json }
       - run: npm ci
