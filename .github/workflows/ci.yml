@@ -37,7 +37,7 @@ jobs:
       FILES_DIR: ./data/files
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: 22, cache: npm, cache-dependency-path: source/package-lock.json }
       - run: npm ci
       - run: npm run typecheck
