@@ -99,7 +99,7 @@ C) ทดสอบ
 
 Unit test
    npm test
-   อธิบาย: รัน Vitest (ตอนนี้ 120 เคส: สิทธิ์, การค้นหา/ไฮไลต์, รหัสผ่าน, ป้าย/tag, ไฟล์แนบ, ประวัติเวอร์ชัน) ไม่ต้องใช้ฐานข้อมูล
+   อธิบาย: รัน Vitest (ตอนนี้ 123 เคส: สิทธิ์, การค้นหา/ไฮไลต์, รหัสผ่าน, ป้าย/tag, ไฟล์แนบ, ประวัติเวอร์ชัน) ไม่ต้องใช้ฐานข้อมูล
 
 Build แบบ production
    npm run build
@@ -112,12 +112,22 @@ Build แบบ production
    ADMIN_EMAIL=<อีเมล admin> ADMIN_PW=<รหัส admin> MEMBER_EMAIL=<อีเมลที่ยังไม่เคยใช้> \
    bash scripts/e2e-items.sh
 
-   อธิบาย: ยิง HTTP จริงตรวจสิทธิ์ การสืบทอด 409 ป้าย/tag/Markdown ไฟล์แนบ ประวัติเวอร์ชัน และการค้นหา ถังขยะ และ Admin (264 เช็ก) จบด้วย passed=… failed=…
+   อธิบาย: ยิง HTTP จริงตรวจสิทธิ์ การสืบทอด 409 ป้าย/tag/Markdown ไฟล์แนบ ประวัติเวอร์ชัน และการค้นหา ถังขยะ และ Admin (267 เช็ก) จบด้วย passed=… failed=…
    - PY=python เพราะ python3 บนเครื่องนี้เป็นแค่ทางลัดไป Microsoft Store
    - PSQL ใช้ psql ใน container เพราะเครื่องนี้ไม่ได้ติดตั้ง psql
    - สคริปต์จะเชิญ MEMBER_EMAIL เป็นสมาชิกใหม่ และนับจำนวนแบบ workspace ว่าง
      จึงควรรันกับ workspace ทดสอบที่ว่าง (ถ้ารันกับ workspace จริงที่มีข้อมูล ตัวเลขบางข้อจะไม่ตรง)
    - ถ้า admin ยังต้องเปลี่ยนรหัส สคริปต์จะเปลี่ยนให้เป็น Admin-New-Pass-77 อัตโนมัติ
+
+
+ทดสอบสิทธิ์แบบครบทุกช่องทาง (permission matrix §16.1 + flow หลัก §16.3) — 690 เช็ก ใช้เวลา ~1 นาที
+   npm run e2e:matrix
+   อธิบาย: สร้าง workspace/ผู้ใช้ทดสอบเองใน DB แล้วยิง HTTP จริงที่ http://localhost:3100 (ต้องเปิดเว็บไว้ก่อน)
+   ใช้พอร์ตอื่น: BASE=http://localhost:3200 npm run e2e:matrix
+
+ทดสอบ auth/คำเชิญ/header ความปลอดภัย (ใช้ workspace ใหม่)
+   npx tsx --env-file=.env scripts/e2e-workspace.ts /tmp/e2e.env && set -a && . /tmp/e2e.env && set +a
+   INVITE_EMAIL="$INVITE_EMAIL" PY=python PSQL="docker exec -i source-db-1 psql -U inventory inventory" bash scripts/e2e-auth.sh
 
 
 ----------------------------------------------------------

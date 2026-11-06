@@ -26,7 +26,7 @@ Next.js 15 App Router (TypeScript, webpack) · Drizzle ORM + `pg` · PostgreSQL 
 | 5 | ไฟล์แนบใต้ Note, หน้า History + diff + กู้เวอร์ชัน, dialog 409 แบบ 3 ทาง | เสร็จ (e2e 113/113 + ตรวจในเบราว์เซอร์: อัปโหลดรูปชื่อไทย, dialog 409, History ของ snapshot เก่า) |
 | 6 | ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet | เสร็จ (e2e 163/163, วัดที่ 50,000 รายการ: ค้นทั่วไป 3–55 ms / กรณีสุดโต่ง 279 ms, ตรวจในเบราว์เซอร์) |
 | 7 | ถังขยะ, Admin › รายการส่วนตัว/audit log/ตั้งค่า/โอนเจ้าของ, backup + runbook | เสร็จ (e2e 264/264, ข้าม workspace 22/22, restore-test จริง) — **restic/compose บนเซิร์ฟเวอร์จริงยังไม่เคยรัน** |
-| 8 | ทดสอบตาม DoD, แก้บั๊ก, เอกสาร, deploy | **ถัดไป** |
+| 8 | ทดสอบตาม DoD, แก้บั๊ก, เอกสาร, deploy | ทำแล้ว: permission matrix, hardening (CSP/role DB/uuid), e2e-auth, CI · docker compose + Caddy/HTTPS ตรวจจริงแล้ว (stack ชั่วคราว) · **เหลือ:** backup restic รอบแรก, Playwright, deploy เซิร์ฟเวอร์จริง |
 
 เลื่อนไปเฟส 2 (อย่าทำตอนนี้): Google login, share รายบุคคล/กลุ่ม, access requests, pin, notifications, หน้า "บัญชีของฉัน", mobile, light mode
 
@@ -44,6 +44,7 @@ src/lib/versions.ts    listVersions / getVersionWithPrev / restoreVersion (ก�
 src/lib/search/query.ts  searchItems (ผล+total+facet+คำแนะนำ) / quickSearch — ทุก query ผ่าน visibleItemsWhere ใน SQL · src/lib/search/snippet.ts pure: highlight, bodyExcerpt, buildResultSnippet
 src/lib/trash.ts      ถังขยะ: listTrash / restoreItem / purgeItem / purgeExpired (งานรายคืน 30 วัน) · src/lib/admin-items.ts รายการส่วนตัว (metadata) + transferItem · src/lib/admin-audit.ts + audit-format.ts (กรอง/CSV) · src/lib/workspace-settings.ts
 src/lib/highlight.ts   Shiki highlighter ตัวเดียว (JS regex engine, ธีมเองตาม ui-design §3.1) ใช้ผ่าน @shikijs/rehype ใน MarkdownView
+src/middleware.ts      CSP แบบ nonce (ข้าม /api) · src/lib/uuid.ts isUuid (id ที่ไม่ใช่ UUID = 404)
 src/lib/auth/          Better Auth config (lazy), session helper, password policy
 src/lib/api.ts         userRoute()/requireAdmin() — ตรวจ Origin(CSRF) + session + แปลง AppError → HTTP
 src/lib/audit.ts       เขียน audit_logs   ·  src/lib/errors.ts  AppError, notFound
@@ -52,7 +53,7 @@ src/app/api/v1/…       REST: auth, admin/{users,invites,private-items,items/:i
 src/components/        MarkdownView (server, MarkdownAsync: sanitize → Shiki) + CodePre (Copy), CodeEditor (CodeMirror 6 โหมด Markdown), TagInput, KindChips, ItemEditor (Editor เดียว), AttachmentPanel/AttachmentList, DiffView, ConflictDialog (409 แบบ 3 ทาง), CommandPalette (Ctrl+K, cmdk) + RecentTracker, Marked (ไฮไลต์)
 src/app/(app)/…        หน้าหลังล็อกอิน (layout ตรวจ session + sidebar tree)
 drizzle/*.sql          migration แบบ SQL ล้วน รันด้วย scripts/migrate.ts ตามชื่อไฟล์
-scripts/               migrate, seed, doctor, poc-thai-search, purge-trash.ts (job:purge), reset-password.ts (user:reset-password), backup.sh, restore-test.sh, e2e-auth.sh, e2e-items.sh
+scripts/               e2e-matrix.ts (permission matrix §16.1), e2e-workspace.ts, create-app-user.ts (db:app-user), migrate, seed, doctor, poc-thai-search, purge-trash.ts (job:purge), reset-password.ts (user:reset-password), backup.sh, restore-test.sh, e2e-auth.sh, e2e-items.sh
 tests/                 Vitest unit tests (ไม่ต้องใช้ DB)
 ```
 
@@ -96,9 +97,10 @@ npm run dev                      # http://localhost:3000
 
 ## ทดสอบ
 
-- `npm test` (Vitest, 120 เคส: permission matrix (รวมถังขยะ), audit-format (CSV), search (normalize/parseQuery/query), snippet (ไฮไลต์), password policy, item-content, attachment-meta, item-history) · `npm run typecheck` · `npm run build`
+- `npm test` (Vitest, 123 เคส: permission matrix (รวมถังขยะ), uuid, audit-format (CSV), search (normalize/parseQuery/query), snippet (ไฮไลต์), password policy, item-content, attachment-meta, item-history) · `npm run typecheck` · `npm run build`
 - e2e (ต้องมีเซิร์ฟเวอร์รันอยู่ + DB ที่ seed แล้ว + `psql`; เขียนเป็น bash — บน Windows ใช้ Git Bash/WSL): `scripts/e2e-auth.sh` (login lockout, เชิญ, รีเซ็ตรหัส, ปิดบัญชี) และ `scripts/e2e-items.sh` (สิทธิ์/สืบทอด/409/ความลึก + ป้าย/tag/Markdown) ตั้งตัวแปร env `B`, `PSQL`, `ADMIN_EMAIL`, `ADMIN_PW`, `MEMBER_EMAIL`, `PY` ให้ตรงกับเครื่อง — บนเครื่องนี้: `PY=python` (python3 เป็นแค่ stub ของ Store), `PSQL="docker exec -i source-db-1 psql -U inventory inventory"`, `B=http://localhost:3100`
-- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-06 หลังสัปดาห์ 7: 264/264 ผ่าน) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน · `curl -F file=@…` บน Windows อ่าน path แบบ `/tmp/…` ไม่ได้ ต้องใช้ `cygpath -m` (สคริปต์ทำให้แล้ว)
+- **สร้าง workspace ทดสอบ + ตัวแปร:** `npx tsx --env-file=.env scripts/e2e-workspace.ts /tmp/e2e.env` แล้ว `set -a; . /tmp/e2e.env; set +a` (ได้ `ADMIN_EMAIL`/`ADMIN_PW`/`MEMBER_EMAIL`/`INVITE_EMAIL`) · `npm run e2e:matrix` สร้างข้อมูลของตัวเอง (ต้องมีเซิร์ฟเวอร์ที่ B=http://localhost:3100) · CI รันทั้งสามชุดใน `.github/workflows/ci.yml`
+- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-06 สัปดาห์ 8: items 267/267, auth 90/90; + `npm run e2e:matrix` 690/690) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน · `curl -F file=@…` บน Windows อ่าน path แบบ `/tmp/…` ไม่ได้ ต้องใช้ `cygpath -m` (สคริปต์ทำให้แล้ว)
 - เพิ่มเทสต์ทุกครั้งที่แตะ permission engine; ทุก endpoint ใหม่ต้องมีเคส "ไม่มีสิทธิ์ → 404" และ "ข้าม workspace"
 - ยังไม่มีเทส UI/Playwright (อยู่ในแผนสัปดาห์ 8) — หน้า Editor/Detail/หน้าแรก ตรวจในเบราว์เซอร์แล้ว แต่หน้า Login/Admin/Collection ของสัปดาห์ 2–3 ยังไม่ได้ไล่ดูละเอียดเทียบ ui-design
 - พอร์ต 3000 บนเครื่องนี้มีบริการอื่น (Gotenberg) จับอยู่ — `.claude/launch.json` รัน dev ที่ **3100**
@@ -149,13 +151,24 @@ npm run dev                      # http://localhost:3000
 - **Backup/ปฏิบัติการ**: `scripts/backup.sh` (pg_dump + restic + นโยบาย 7/4/6), `scripts/restore-test.sh` (กู้ลง DB ชั่วคราว ICU th-TH ตรวจแถว/ค้นไทย/append-only แล้วลบทิ้ง — ทดสอบจริงแล้ว), `scripts/reset-password.ts` (ทางหนีไฟ — ทดสอบจริงแล้ว) และ `docs/runbook.md` · **ยังไม่เคยรัน restic และ docker compose บนเซิร์ฟเวอร์จริง** (ไม่มี restic ในเครื่อง dev) ต้องรันครั้งแรกด้วยมือตาม runbook §2.3
 - ระวังตอนเขียนสคริปต์ bash: `cmd | grep -q` + `set -o pipefail` ให้ผลเท็จ (grep ปิด pipe เร็ว) — เก็บผลลัพธ์ก่อนแล้วค่อย grep (เจอจริงใน restore-test.sh)
 
+## สัปดาห์ 8 — ความปลอดภัย / ทดสอบ DoD — ข้อควรรู้
+
+- **Permission matrix** (`npm run e2e:matrix`): ผู้ใช้ A เจ้าของ / B member / D admin / F ถูกปิดบัญชีระหว่างทดสอบ / E admin คนละ workspace / ANON × รายการ 7 แบบ (private, view, edit, inherit จาก Collection ส่วนตัว/ทีมแก้ไข, เปิดกว้างกว่า Collection แม่, ถังขยะ) × ช่องทาง §16.1 ข้อ 1–10 + กรณีเปลี่ยนแปลง + flow §16.3 ผ่าน HTTP จริง · ทดสอบสิทธิ์ "แก้" ด้วย `PUT` ที่ version เก่าเกินจริง (สิทธิ์ถูกตรวจก่อน version: แก้ได้ = 409, ดูได้แต่แก้ไม่ได้ = 403, ไม่เห็น = 404) — ถ้าเพิ่ม endpoint/ช่องทางที่คืนข้อมูลรายการ ให้เพิ่มเคสที่นี่
+- **id ที่ไม่ใช่ UUID = 404** (เคยเป็น 500 จาก Postgres บน 23 endpoint/หน้า): `userRoute`/`adminRoute` ตรวจพารามิเตอร์ชื่อ `id` และ `loadItem`/`loadCollection`/`updateItem`/ไฟล์แนบ/ถังขยะ/โอน ตรวจซ้ำ — **route ใหม่ที่รับ id ต้องใช้ตัวครอบนี้ หรือเรียก `isUuid` เอง**; ค่า UUID ใน body ตรวจด้วย zod `.uuid()` อยู่แล้ว
+- **CSP** (`src/middleware.ts`): `script-src 'self' 'nonce-…' 'strict-dynamic'` (dev เพิ่ม `unsafe-eval`/ws), `style-src 'unsafe-inline'` (Shiki/CodeMirror), ข้าม `/api/` (กัน middleware บัฟเฟอร์ไฟล์อัปโหลดใหญ่; ดาวน์โหลดไฟล์ตั้ง CSP เอง) · **หน้าที่ถูก prerender เป็น static จะไม่มี nonce และ script พัง** — หน้าใหม่ต้องเป็น dynamic (ใช้ cookies/headers หรือ `export const dynamic = "force-dynamic"`) · ตรวจแล้วทั้ง dev และ `next start` (ไม่มี violation)
+- **Header อื่น**: Permissions-Policy, COOP/CORP same-origin (`next.config.ts`) · HSTS ตั้งที่ Caddy · cookie `Secure` เมื่อ `APP_BASE_URL` เป็น https (`advanced.useSecureCookies`)
+- **role DB สิทธิ์ต่ำ** (migration `0004`, `npm run db:app-user`): `inventory_app` ไม่ใช่ superuser, DDL ไม่ได้, `audit_logs` อ่าน/เพิ่มได้อย่างเดียว, ไม่เห็น `_migrations` · migrate/seed/purge ด้วยมือ/reset-password ใช้เจ้าของ (`DATABASE_URL`) ส่วน compose service `app` และ `purge` ใช้ `APP_DATABASE_URL` (ว่าง = ใช้ `DATABASE_URL` เหมาะ dev) · **ตารางใหม่ใน migration ถัดไปได้สิทธิ์ CRUD อัตโนมัติ — ถ้าต้อง append-only ให้ REVOKE เองใน migration นั้น** · ทดสอบแล้วว่าชุดทดสอบทั้งหมดผ่านเมื่อเซิร์ฟเวอร์ต่อด้วย role นี้
+- **zod 4.6.7** (จาก npm audit; โค้ดเดิมใช้ได้ไม่ต้องแก้) · ช่องโหว่ที่เหลือและยอมรับไว้: `postcss` ที่ฝังใน Next (ประมวลผลเฉพาะ CSS ของเราตอน build) แก้ได้ต้องอัปเกรด Next ข้ามไป 16 — ทำเป็นงานแยก · `npm audit --omit=dev --audit-level=critical` อยู่ใน CI
+- **e2e-auth.sh** เขียนใหม่ให้ตัดสินผ่าน/ไม่ผ่าน: throttle, CSRF, เส้นทาง Better Auth ที่ปิด, คำเชิญ (token เป็น hash), รีเซ็ต/ปิดบัญชี, header ความปลอดภัย, สิทธิ์ role DB, ไม่มีรหัสผ่านใน audit
+- **docker compose + Caddy ตรวจจริงแล้ว** (stack ชั่วคราว ลบทิ้งแล้ว): migrate 0000–0004, role `inventory_app`, HTTPS/HSTS/CSP nonce/cookie Secure, matrix 690/690 ผ่าน Caddy, อัปโหลด 40 MB ได้/51 MB = 413, purge ทำงาน · Caddy เขียนทับ `X-Forwarded-For` จึงข้าม login throttle ไม่ได้ **แต่ต้องไม่เปิดพอร์ตของ service `app` ออกนอก compose**
+- **ยังไม่มี**: Playwright (ต้องดาวน์โหลดเบราว์เซอร์ — flow §16.3 ครอบคลุมด้วย HTTP ใน e2e-matrix + ตรวจในเบราว์เซอร์ด้วยมือ), การรัน restic จริง, Renovate (ใช้ Dependabot)
+
 ## ช่องว่างที่รู้อยู่แล้ว (ทำตอนถึงสัปดาห์ที่เกี่ยวข้อง)
 
 - dialog ย้ายรายการเตือนแบบรวม ๆ ยังไม่แยกกรณี "สิทธิ์เปิดกว้างขึ้น" (design §4.4.4)
 - ยังไม่มีการเลือกลบหลายรายการ/ล้างถังขยะทั้งหมดในครั้งเดียว
 - ยังไม่มี endpoint `/me`, `/auth/methods`
-- แอปตั้ง `X-Frame-Options` ฯลฯ เบื้องต้นใน `next.config.ts`; CSP แบบ strict ยังไม่ได้ใส่
-- Dockerfile/compose ผ่านการเขียนแล้วแต่ **ยังไม่เคย build จริง** (service `migrate` ใช้ stage `build`); backup (restic) อยู่สัปดาห์ 7
+- Dockerfile/compose build และรันจริงแล้ว (สัปดาห์ 8) แต่ **restic ยังไม่เคยรัน** และยังไม่ได้ deploy บนเซิร์ฟเวอร์จริง
 
 ## ธรรมเนียมการทำงาน
 

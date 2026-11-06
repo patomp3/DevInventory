@@ -82,6 +82,15 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 **เอกสาร**
 - `CLAUDE.md` อัปเดต: สถานะสัปดาห์ 4 = เสร็จ / สัปดาห์ 5 = ถัดไป, โครงสร้างไฟล์ใหม่, จำนวนเทสต์, วิธีรัน e2e บนเครื่องนี้, ส่วน "สัปดาห์ 4 — สิ่งที่ทำและข้อควรรู้"
 
+### สัปดาห์ 8 — ทดสอบตาม DoD / ความปลอดภัย / deploy (เสร็จ 2026-11-06)
+
+- Permission matrix `npm run e2e:matrix` **690/690** (ผู้ใช้ 6 แบบ × รายการ 7 แบบ × ช่องทาง §16.1 + กรณีเปลี่ยนสิทธิ์ + flow §16.3) · `e2e-items.sh` 267/267 · `e2e-auth.sh` 90/90 (เขียนใหม่ให้ตัดสินผ่าน/ไม่ผ่าน) · unit 123 เคส
+- แก้บั๊ก: id ที่ไม่ใช่ UUID ทำให้ 500 บน 23 endpoint/หน้า → 404 (`isUuid` ใน wrapper + loader); Docker build พังเพราะไม่มี env ตอน build → ทั้งแอป `force-dynamic` และเรียก `headers()` ก่อน `getAuth()`
+- Hardening: CSP แบบ nonce (`src/middleware.ts`), Permissions-Policy/COOP/CORP, HSTS ที่ Caddy, cookie Secure, role DB `inventory_app` (migration 0004), zod 4.6.7 (npm audit)
+- CI (`.github/workflows/ci.yml`): typecheck, unit, audit, build, migrate + role, matrix, e2e, restore test — เขียวบน main · Dependabot
+- ตรวจ docker compose + Caddy จริงด้วย stack ชั่วคราว (ลบทิ้งแล้ว): HTTPS/HSTS/CSP/cookie Secure, matrix 690/690 ผ่าน Caddy, อัปโหลด 40 MB ได้ และ 51 MB = 413, purge, restore-test; Caddy เขียนทับ X-Forwarded-For
+- เอกสาร: DoD §16.4 ติ๊กแล้ว (เหลือ backup ส่วน restic), runbook §0 ติดตั้งครั้งแรก, CLAUDE.md, run.txt
+
 ## Decision ที่ตกลงกันแล้ว (Key Decisions)
 
 - **D22: รายการทุกชิ้นเป็น Note + ป้าย kinds หลายป้าย** — ผู้ใช้ต้องการลดความซับซ้อน ให้ใส่ทุกอย่างในเนื้อหาเอง · ไฟล์แนบ (สัปดาห์ 5) อยู่ใต้ Note ไม่มีประเภท File
@@ -104,7 +113,7 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 
 - ไม่มี blocker
 - repo GitHub **`patomp3/DevInventory` เป็น public** — ระวังอย่า commit ข้อมูลลับ (`.env`, dump, cookie jar); `Claude outputs/` ถูก ignore
-- CSP แบบ strict ยังไม่ได้ใส่: Shiki ใช้ `style` inline และ CodeMirror inject `<style>` → ตอนใส่ CSP ต้องอนุญาต `style-src 'unsafe-inline'` หรือใช้ `EditorView.cspNonce`/class
+- (แก้แล้วในสัปดาห์ 8) CSP แบบ strict ยังไม่ได้ใส่: Shiki ใช้ `style` inline และ CodeMirror inject `<style>` → ตอนใส่ CSP ต้องอนุญาต `style-src 'unsafe-inline'` หรือใช้ `EditorView.cspNonce`/class
 - ยังไม่มี "กำลังแก้ไขโดย …" (heartbeat) ตาม design §10.2; purge ไฟล์แนบจริงจากดิสก์ยังไม่มี (ทำพร้อมถังขยะ สัปดาห์ 7)
 - ข้อมูลทดสอบค้างใน dev DB: workspace "W4 test" (3 ผู้ใช้) และ workspace `e2e-*` หลายชุด — ลบไม่ได้ง่ายเพราะ `audit_logs` เป็น append-only (FK) ถ้าต้องการสะอาดให้ `docker compose … down -v` แล้ว migrate/seed ใหม่
 - หน้า Login/Admin/Collection ของสัปดาห์ 2–3 ยังไม่ได้ไล่ตรวจด้วยตาเทียบ ui-design
@@ -119,7 +128,8 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 3. ปรับ `scripts/e2e-auth.sh` ให้รับ `ADMIN_EMAIL`/`PY` แบบเดียวกับ e2e-items.sh แล้วรันบน workspace ทดสอบ
 4. ไล่ตรวจหน้าจอสัปดาห์ 2–3 ในเบราว์เซอร์เทียบ ui-design
 2b. (เสร็จ 2026-11-06) สัปดาห์ 7 — **ถัดไป = สัปดาห์ 8**: ทดสอบตาม DoD (design §16.4), รันจริงบน docker compose/Caddy, backup restic รอบแรก, แก้บั๊ก, เอกสาร, deploy · (เสร็จแล้ว) สัปดาห์ 6 ค้นหา — เดิมของข้อนี้ (สัปดาห์ 7): ถังขยะ (restore/purge รวมลบไฟล์แนบจริงบนดิสก์), Admin › รายการส่วนตัว/audit log/ตั้งค่า + TransferDialog, backup (restic) — เดิมของข้อ 2b: หน้าค้นหาเต็มรูปแบบ (แทนหน้า `/tags/[slug]` ด้วย `tag:`), Ctrl+K, facet ตามป้าย, `kind:` (index `items_kinds`), `lang:` หาจาก code fence ใน body
-6. ตอนใส่ CSP strict: จัดการ inline style ของ Shiki/CodeMirror
+6. (เสร็จ สัปดาห์ 8) CSP strict ใส่แล้ว โดยอนุญาต `style-src 'unsafe-inline'` สำหรับ Shiki/CodeMirror
+7. **เหลือ:** รัน `backup.sh` + restic รอบแรกบนเซิร์ฟเวอร์จริง (ต้องติดตั้ง restic), deploy จริงตาม runbook §0, Playwright (ต้องดาวน์โหลดเบราว์เซอร์ — รออนุมัติ), อัปเกรด Next 16 (postcss advisory; Dependabot เปิด PR ไว้แล้ว ต้องตรวจก่อน merge)
 
 ## Context สำคัญอื่นๆ (Notes)
 

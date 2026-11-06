@@ -822,12 +822,12 @@ volumes: { files: {}, pgdata: {}, caddy: {} }
 login → สร้าง Collection → สร้าง Note ป้าย snippet พร้อมไฟล์แนบ → ค้นเจอ → B ดูได้แต่แก้ไม่ได้ → เปลี่ยนเป็น workspace_edit → B แก้ได้ → ดูประวัติ → กู้เวอร์ชัน → ลบ → กู้จากถังขยะ
 
 ### 16.4 DoD เฟส 1
-- [ ] ฟีเจอร์ในหัวข้อ 3 (เฟส 1) ครบ
-- [ ] Permission matrix 16.1 ผ่านทั้งหมดใน CI
-- [ ] Search test 16.2 ผ่าน รวมถึง PoC ภาษาไทย (8.8)
-- [ ] E2E 16.3 ผ่าน
-- [ ] Backup ทำงาน และทดสอบ restore สำเร็จ 1 ครั้ง
-- [ ] มี README การติดตั้ง + runbook (backup/restore, reset รหัส Admin)
+- [x] ฟีเจอร์ในหัวข้อ 3 (เฟส 1) ครบ
+- [x] Permission matrix 16.1 ผ่านทั้งหมดใน CI (690/690, `npm run e2e:matrix`)
+- [x] Search test 16.2 ผ่าน รวมถึง PoC ภาษาไทย (8.8)
+- [x] E2E 16.3 ผ่าน (ผ่าน HTTP ใน e2e-matrix + ตรวจในเบราว์เซอร์; ยังไม่มี Playwright)
+- [ ] Backup ทำงาน และทดสอบ restore สำเร็จ 1 ครั้ง (restore ผ่านแล้ว: pg_dump → `restore-test.sh`; **ส่วน restic ยังไม่เคยรันจริง**)
+- [x] มี README การติดตั้ง + runbook (backup/restore, reset รหัส Admin)
 
 ---
 

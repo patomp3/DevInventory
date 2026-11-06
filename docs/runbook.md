@@ -3,6 +3,22 @@
 > สำหรับผู้ดูแลเซิร์ฟเวอร์ · เวอร์ชัน 2026-11-06 (สัปดาห์ 7) · คำสั่งทั้งหมดรันจากโฟลเดอร์ `source/` ของโปรเจกต์บนเซิร์ฟเวอร์
 > **สถานะการทดสอบ:** `pg_dump` + `restore-test.sh` + `reset-password` ทดสอบจริงแล้วบนเครื่อง dev · ส่วนที่ใช้ **restic** (`backup.sh` ขั้น 2–3) และ **docker compose บนเซิร์ฟเวอร์จริง** ยังไม่เคยรันจริง (ไม่มี restic ในเครื่องพัฒนา) — ให้รัน backup ครั้งแรกด้วยมือและตรวจผลตามหัวข้อ 2.3 ก่อนเชื่อถือ
 
+## 0. ติดตั้งครั้งแรก (production)
+
+1. `cp .env.example .env` แล้วแก้ทุกค่า (`APP_DOMAIN`, `APP_BASE_URL=https://…`, รหัส DB, `BETTER_AUTH_SECRET` ด้วย `openssl rand -base64 32`, รหัส Admin เริ่มต้น)
+2. `docker compose up -d --build` — service `migrate` สร้างตารางและ Admin คนแรก (ต้องเปลี่ยนรหัสตอนเข้าครั้งแรก)
+3. **เปิดใช้ role ฐานข้อมูลสิทธิ์ต่ำของแอป** (design §14 — ทำครั้งเดียว):
+   ```bash
+   APP_DB_PASSWORD="$(openssl rand -base64 24)" docker compose run --rm -e APP_DB_PASSWORD migrate npm run db:app-user
+   ```
+   สคริปต์พิมพ์ `APP_DATABASE_URL=postgres://inventory_app:<APP_DB_PASSWORD>@db:5432/<db>` — ใส่ค่าจริง (รหัสเดียวกับที่ตั้ง) ลงใน `.env` แล้ว `docker compose up -d app purge` · ตรวจ: `docker compose exec db psql -U $POSTGRES_USER -d $POSTGRES_DB -c "select usename, count(*) from pg_stat_activity group by 1"` ต้องเห็น `inventory_app`
+4. ตรวจหน้าเว็บด้วย HTTPS: ล็อกอินได้, header `Strict-Transport-Security` และ `Content-Security-Policy` ปรากฏ (`curl -sI https://โดเมน/login`), cookie มี `Secure`
+5. ตั้ง backup ตามหัวข้อ 2
+- **ห้ามเปิดพอร์ตของ service `app` ตรง ๆ** (ไม่ใส่ `ports:` ให้ app): การกัน brute-force ของ login อาศัย IP จาก `X-Forwarded-For` ที่ Caddy เขียนทับให้ — ถ้าผู้ใช้ยิงเข้า app ตรง ๆ จะปลอม IP เลี่ยง throttle ได้ (ตรวจแล้วว่าผ่าน Caddy ปลอมไม่ได้)
+- ตรวจแล้วบน compose จริง (2026-11-06): migrate/seed, role `inventory_app`, HTTPS + HSTS + CSP, cookie Secure, อัปโหลด 40 MB, งาน purge, restore-test ผ่าน
+- ถังขยะ/ไฟล์แนบ/ค้นหาไทยต้องใช้ฐานข้อมูลที่สร้างด้วย ICU `th-TH` (compose ตั้งให้แล้ว)
+- ใช้ `tls internal` ใน Caddy (เครือข่ายภายใน): เบราว์เซอร์ต้องเชื่อ CA ของ Caddy ก่อน และ HSTS ที่ตั้งไว้จะบังคับ HTTPS ต่อเนื่อง 1 ปี — ถ้าอาจย้ายกลับไป HTTP ให้ลบบรรทัด `Strict-Transport-Security` ใน `Caddyfile` ก่อนเปิดใช้จริง
+
 ## 1. บริการและข้อมูลสำคัญ
 
 | อะไร | อยู่ที่ไหน | หมายเหตุ |
@@ -10,6 +26,7 @@
 | ฐานข้อมูล PostgreSQL 17 | docker volume `pgdata` (service `db`) | สร้างด้วย ICU `th-TH` — **จำเป็น** ต่อการค้นภาษาไทย |
 | ไฟล์แนบ | docker volume `files` → `/data/files/{workspace_id}/{uuid}` | ไม่มีชื่อจริงใน path ชื่อจริงอยู่ในตาราง `attachments` |
 | งานลบถาวรรายคืน | service `purge` | ลบรายการในถังขยะที่เกิน 30 วัน + ไฟล์จริง วันละครั้งนับจากเวลาที่ container เริ่ม |
+| role DB ของแอป | `inventory_app` (migration 0004) | สิทธิ์ต่ำ: แก้/ลบ `audit_logs` ไม่ได้ · migrate/seed/รีเซ็ตรหัสใช้เจ้าของ (`DATABASE_URL`) |
 | ความลับ | `.env` (ไม่อยู่ใน git) | `BETTER_AUTH_SECRET`, รหัส DB, รหัส Admin เริ่มต้น — **สำรองไว้ที่ปลอดภัยแยกจาก backup ข้อมูล** |
 
 ข้อมูลที่ต้องสำรองครบ 3 อย่าง: **ฐานข้อมูล + ไฟล์แนบ + `.env`** (ถ้าเสีย `BETTER_AUTH_SECRET` ผู้ใช้ทุกคนต้องล็อกอินใหม่ แต่ข้อมูลไม่หาย)
