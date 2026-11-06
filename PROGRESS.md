@@ -127,7 +127,7 @@ Session นี้ทำ **สัปดาห์ 4 ตามแผน design.md �
 2. (เสร็จ 2026-11-06) สัปดาห์ 5: ไฟล์แนบ, History + กู้เวอร์ชัน, dialog 409
 3. ปรับ `scripts/e2e-auth.sh` ให้รับ `ADMIN_EMAIL`/`PY` แบบเดียวกับ e2e-items.sh แล้วรันบน workspace ทดสอบ
 4. ไล่ตรวจหน้าจอสัปดาห์ 2–3 ในเบราว์เซอร์เทียบ ui-design
-2b. (เสร็จ 2026-11-06) สัปดาห์ 7 — **ถัดไป = สัปดาห์ 8**: ทดสอบตาม DoD (design §16.4), รันจริงบน docker compose/Caddy, backup restic รอบแรก, แก้บั๊ก, เอกสาร, deploy · (เสร็จแล้ว) สัปดาห์ 6 ค้นหา — เดิมของข้อนี้ (สัปดาห์ 7): ถังขยะ (restore/purge รวมลบไฟล์แนบจริงบนดิสก์), Admin › รายการส่วนตัว/audit log/ตั้งค่า + TransferDialog, backup (restic) — เดิมของข้อ 2b: หน้าค้นหาเต็มรูปแบบ (แทนหน้า `/tags/[slug]` ด้วย `tag:`), Ctrl+K, facet ตามป้าย, `kind:` (index `items_kinds`), `lang:` หาจาก code fence ใน body
+2b. (เสร็จ 2026-11-06) สัปดาห์ 7 และ 8 — งานที่เหลือดูข้อ 7 ด้านล่าง
 6. (เสร็จ สัปดาห์ 8) CSP strict ใส่แล้ว โดยอนุญาต `style-src 'unsafe-inline'` สำหรับ Shiki/CodeMirror
 7. **เหลือ:** รัน `backup.sh` + restic รอบแรกบนเซิร์ฟเวอร์จริง (ต้องติดตั้ง restic), deploy จริงตาม runbook §0, Playwright (ต้องดาวน์โหลดเบราว์เซอร์ — รออนุมัติ), อัปเกรด Next 16 (postcss advisory; Dependabot เปิด PR ไว้แล้ว ต้องตรวจก่อน merge)
 
