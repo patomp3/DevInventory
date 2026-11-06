@@ -1,0 +1,96 @@
+"use client";
+import { useEffect, useRef } from "react";
+import { closeBrackets, closeBracketsKeymap } from "@codemirror/autocomplete";
+import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import { bracketMatching, HighlightStyle, indentOnInput, LanguageDescription, syntaxHighlighting } from "@codemirror/language";
+import { languages } from "@codemirror/language-data";
+import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
+import { Compartment, EditorState } from "@codemirror/state";
+import {
+  drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, placeholder as placeholderExt,
+} from "@codemirror/view";
+import { tags as t } from "@lezer/highlight";
+import { markdown } from "@codemirror/lang-markdown";
+
+// ธีมเดียวกับ CodeBlock (ui-design §3.1): key #7cb7ff · string #a5d6a7 · comment #7d8797 · ทั่วไป #c3cad6
+const theme = EditorView.theme({
+  "&": { backgroundColor: "var(--code-bg)", color: "#c3cad6", fontSize: "13px", borderRadius: "10px", border: "1px solid var(--border)" },
+  "&.cm-focused": { outline: "2px solid var(--accent)", outlineOffset: "1px" },
+  ".cm-scroller": { fontFamily: "var(--font-mono)", lineHeight: "1.7" },
+  ".cm-content": { padding: "10px 0", caretColor: "#f2b84b" },
+  ".cm-cursor, .cm-dropCursor": { borderLeftColor: "#f2b84b" },
+  ".cm-gutters": { backgroundColor: "var(--code-bg)", color: "#7d8797", border: "none", borderRadius: "10px 0 0 10px" },
+  ".cm-activeLine": { backgroundColor: "rgb(255 255 255 / 0.05)" },
+  ".cm-activeLineGutter": { backgroundColor: "rgb(255 255 255 / 0.05)", color: "#c3cad6" },
+  "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection": { backgroundColor: "rgb(242 184 75 / 0.22)" },
+  ".cm-placeholder": { color: "#7d8797" },
+  ".cm-panels": { backgroundColor: "var(--sidebar)", color: "var(--text)" },
+}, { dark: true });
+
+const highlightStyle = HighlightStyle.define([
+  { tag: [t.keyword, t.controlKeyword, t.definitionKeyword, t.modifier, t.operatorKeyword, t.tagName, t.propertyName, t.attributeName, t.bool, t.null, t.self, t.heading], color: "#7cb7ff" },
+  { tag: [t.string, t.special(t.string), t.regexp, t.monospace, t.inserted], color: "#a5d6a7" },
+  { tag: [t.comment, t.lineComment, t.blockComment, t.meta], color: "#7d8797", fontStyle: "italic" },
+  { tag: [t.function(t.variableName), t.typeName, t.className], color: "#e7eaf0" },
+  { tag: t.deleted, color: "#f28b82" },
+  { tag: t.strong, fontWeight: "bold" },
+  { tag: t.emphasis, fontStyle: "italic" },
+  { tag: t.link, color: "#f2b84b", textDecoration: "underline" },
+  // เครื่องหมาย Markdown (```, **, #, -) ให้เห็นชัดแต่ไม่แย่งสายตา
+  { tag: [t.processingInstruction, t.contentSeparator, t.labelName], color: "#98a2b3" },
+]);
+
+async function loadLanguage(id: string) {
+  // Markdown: highlight code fence ตามภาษาที่ระบุหลัง ``` ด้วย
+  if (id === "markdown") return [markdown({ codeLanguages: languages })];
+  const desc = LanguageDescription.matchLanguageName(languages, id, true);
+  return desc ? [await desc.load()] : [];
+}
+
+/** CodeMirror 6 (ui-design §6 `CodeEditor`) — controlled แบบหลวม: รับ value เริ่มต้น, ส่งค่าใหม่ผ่าน onChange */
+export function CodeEditor({ value, onChange, language, label, placeholder, minHeight = 220 }: {
+  value: string; onChange: (v: string) => void; language: string; label: string; placeholder?: string; minHeight?: number;
+}) {
+  const host = useRef<HTMLDivElement>(null);
+  const view = useRef<EditorView | null>(null);
+  const lang = useRef(new Compartment());
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    const v = new EditorView({
+      parent: host.current!,
+      state: EditorState.create({
+        doc: value,
+        extensions: [
+          lineNumbers(), highlightActiveLineGutter(), highlightActiveLine(), history(), drawSelection(),
+          indentOnInput(), bracketMatching(), closeBrackets(), highlightSelectionMatches(),
+          keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...searchKeymap, ...historyKeymap, indentWithTab]),
+          syntaxHighlighting(highlightStyle), theme, lang.current.of([]),
+          EditorView.contentAttributes.of({ "aria-label": label }),
+          EditorView.theme({ ".cm-content, .cm-gutter": { minHeight: `${minHeight}px` } }),
+          placeholder ? placeholderExt(placeholder) : [],
+          EditorView.updateListener.of((u) => { if (u.docChanged) onChangeRef.current(u.state.doc.toString()); }),
+        ],
+      }),
+    });
+    view.current = v;
+    return () => { v.destroy(); view.current = null; };
+  }, []); // สร้าง editor ครั้งเดียวต่อ instance (ใช้ key ภายนอกเมื่อต้องการสร้างใหม่)
+
+  // ค่าเปลี่ยนจากภายนอก (เช่น โหลดเวอร์ชันล่าสุดหลัง 409)
+  useEffect(() => {
+    const v = view.current;
+    if (v && v.state.doc.toString() !== value) v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: value } });
+  }, [value]);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadLanguage(language).then((ext) => {
+      if (!cancelled) view.current?.dispatch({ effects: lang.current.reconfigure(ext) });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [language]);
+
+  return <div ref={host} />;
+}

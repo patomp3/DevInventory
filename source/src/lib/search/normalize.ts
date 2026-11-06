@@ -1,6 +1,7 @@
 // การสร้าง search_text และ parser ไวยากรณ์ค้นหา — design.md §8.2–8.3
 
-const MAX_CODE_CHARS = 200 * 1024;
+/** เนื้อหา (รวมโค้ดใน Markdown) ที่ใส่ใน search_text ไม่เกิน 200 KB */
+const MAX_BODY_CHARS = 200 * 1024;
 
 /** NFC, lowercase, ตัด zero-width space, รวม whitespace */
 export function normalize(input: string): string {
@@ -40,25 +41,22 @@ export function stripMarkdown(md: string): string {
 export type SearchSource = {
   title: string;
   summary?: string | null;
+  /** Markdown ทั้งหมด รวม code fence (D22: โค้ด/ลิงก์/วิธีรันอยู่ใน body) */
   body?: string | null;
-  url?: string | null;
-  codeBlocks?: { filename?: string | null; content: string }[];
   attachmentNames?: string[];
   tagNames?: string[];
 };
 
 export function buildSearchText(s: SearchSource): string {
-  let code = (s.codeBlocks ?? []).map((b) => `${b.filename ?? ""} ${b.content}`).join(" ");
-  if (code.length > MAX_CODE_CHARS) code = code.slice(0, MAX_CODE_CHARS);
+  let body = stripMarkdown(s.body ?? "");
+  if (body.length > MAX_BODY_CHARS) body = body.slice(0, MAX_BODY_CHARS);
   const parts = [
     s.title,
     s.summary ?? "",
-    stripMarkdown(s.body ?? ""),
-    s.url ?? "",
-    code,
+    body,
     (s.attachmentNames ?? []).join(" "),
     (s.tagNames ?? []).join(" "),
-    expandIdentifiers(`${code} ${s.title}`),
+    expandIdentifiers(`${body} ${s.title}`),
   ];
   return normalize(parts.join(" "));
 }

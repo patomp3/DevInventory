@@ -1,4 +1,4 @@
-// สะท้อน drizzle/0000_init.sql — แก้ที่ไฟล์ SQL ก่อนเสมอ แล้วปรับไฟล์นี้ให้ตรง
+// สะท้อน drizzle/*.sql (0000_init, 0001_auth, 0002_code_tags, 0003_note_kinds) — แก้ที่ไฟล์ SQL ก่อนเสมอ แล้วปรับไฟล์นี้ให้ตรง
 import { sql } from "drizzle-orm";
 import {
   bigint, bigserial, boolean, customType, index, integer, jsonb, pgEnum, pgTable,
@@ -16,7 +16,6 @@ const stamps = {
 
 export const visibilitySetting = pgEnum("visibility_setting", ["inherit", "private", "workspace_view", "workspace_edit"]);
 export const visibilityEffective = pgEnum("visibility_effective", ["private", "workspace_view", "workspace_edit"]);
-export const itemType = pgEnum("item_type", ["note", "snippet", "script", "file", "link"]);
 export const workspaceRole = pgEnum("workspace_role", ["admin", "member"]);
 
 export const workspaces = pgTable("workspaces", {
@@ -77,12 +76,10 @@ export const items = pgTable("items", {
   id: id(),
   workspaceId: uuid("workspace_id").notNull().references(() => workspaces.id),
   collectionId: uuid("collection_id").references(() => collections.id),
-  type: itemType("type").notNull(),
   title: text("title").notNull(),
   summary: text("summary"),
   body: text("body"),
-  url: text("url"),
-  scriptMeta: jsonb("script_meta"),
+  kinds: text("kinds").array().notNull().default(sql`'{note}'`), // ป้าย note/snippet/script/link (D22, CHECK ใน 0003)
   ownerId: uuid("owner_id").notNull().references(() => users.id),
   visibility: visibilitySetting("visibility").notNull().default("inherit"),
   effectiveVisibility: visibilityEffective("effective_visibility").notNull(),
@@ -94,17 +91,8 @@ export const items = pgTable("items", {
   ...stamps,
 }, (t) => [
   index("items_collection").on(t.collectionId).where(sql`${t.deletedAt} IS NULL`),
+  index("items_kinds").using("gin", t.kinds).where(sql`${t.deletedAt} IS NULL`),
 ]);
-
-export const itemCodeBlocks = pgTable("item_code_blocks", {
-  id: id(),
-  itemId: uuid("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
-  filename: text("filename"),
-  language: text("language").notNull(),
-  content: text("content").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-  ...stamps,
-});
 
 export const attachments = pgTable("attachments", {
   id: id(),
@@ -126,12 +114,12 @@ export const tags = pgTable("tags", {
   name: text("name").notNull(),
   slug: text("slug").notNull(),
   ...stamps,
-}, (t) => [uniqueIndex("tags_workspace_slug").on(t.workspaceId, t.slug)]);
+}, (t) => [uniqueIndex("tags_workspace_slug").on(t.workspaceId, t.slug)]); // CHECK tags_slug_format อยู่ใน 0002
 
 export const itemTags = pgTable("item_tags", {
   itemId: uuid("item_id").notNull().references(() => items.id, { onDelete: "cascade" }),
   tagId: uuid("tag_id").notNull().references(() => tags.id, { onDelete: "cascade" }),
-}, (t) => [primaryKey({ columns: [t.itemId, t.tagId] })]);
+}, (t) => [primaryKey({ columns: [t.itemId, t.tagId] }), index("item_tags_tag").on(t.tagId)]);
 
 export const itemVersions = pgTable("item_versions", {
   id: id(),

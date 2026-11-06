@@ -37,7 +37,7 @@ export default async function CollectionPage({ params }: { params: Promise<{ id:
           {c.description && <p className="mt-2 text-sm text-text-2">{c.description}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          {edit && <Link href={`/new?type=note&c=${id}`} className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:brightness-110">+ เพิ่มรายการ</Link>}
+          {edit && <Link href={`/new?c=${id}`} className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:brightness-110">+ เพิ่มรายการ</Link>}
           {edit && c.depth < 3 && <NewCollectionButton parentId={id} label="+ Collection ย่อย" variant="secondary" />}
           {manage && <CollectionActions id={id} name={c.name} visibility={c.visibility} effective={c.effectiveVisibility} hasParent={!!c.parentId} />}
         </div>

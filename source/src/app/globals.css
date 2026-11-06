@@ -39,3 +39,28 @@ a:focus-visible, button:focus-visible, input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* CodeBlock: ผลลัพธ์จาก Shiki + เลขบรรทัด (ui-design §6) */
+.code-view pre.shiki {
+  margin: 0;
+  padding: 12px 0;
+  overflow-x: auto;
+  background: var(--code-bg) !important;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.code-view pre.shiki:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.code-view code { counter-reset: line; }
+.code-view .line { padding-right: 16px; }
+.code-view .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 3.5em;
+  margin-right: 16px;
+  padding-right: 8px;
+  text-align: right;
+  color: var(--text-faint);
+  user-select: none;
+}

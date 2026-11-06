@@ -52,7 +52,7 @@ export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; 
             <div className="text-text-2">{user.displayName}</div>
             <div className="text-muted">{user.email}</div>
           </div>
-          <Link href="/new?type=note" className="mr-auto rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:brightness-110">+ สร้างใหม่</Link>
+          <Link href="/new" className="mr-auto rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:brightness-110">+ สร้างใหม่</Link>
           <Link href="/change-password" className="rounded-lg px-3 py-2 text-xs text-muted hover:bg-surface-hover">เปลี่ยนรหัสผ่าน</Link>
           <button onClick={logout} className="rounded-lg border border-[var(--border-strong)] px-3 py-2 text-xs text-text-2 hover:bg-surface-hover">ออกจากระบบ</button>
         </header>

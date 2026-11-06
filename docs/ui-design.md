@@ -1,6 +1,6 @@
 # Dev Inventory — UI Design Spec (สำหรับเริ่มเขียน code)
 
-> สถานะ: Draft v1.3 · 2026-11-05 (v1.3: สรุปขอบเขตเริ่มพัฒนา — ของที่ยังไม่มี mockup แยกเป็น "สร้างจากสเปกได้เลย" กับ "เลื่อนไปเฟสถัดไป" (§1.1) · v1.2: เพิ่ม dialog เชิญด้วยอีเมล / ลิงก์เชิญที่สร้างแล้ว / โอนความเป็นเจ้าของ, ตาราง Admin แสดงอีเมลแทน username · v1.1: เพิ่ม Login / SetPassword / Admin 4 หน้า, ระบบใช้อีเมลอย่างเดียว เชิญด้วยอีเมลเท่านั้น, เผื่อปุ่ม Google เฟส 2)
+> สถานะ: Draft v1.4 · 2026-11-05 (v1.4: **รายการเป็น Note ชนิดเดียว + ป้าย (design.md D22)** — Editor เดียว, ไม่มี CreateMenu เลือกประเภท, `TypeChip` → `KindChip`, code fence ใน Markdown แทน `CodeBlock` หลายไฟล์ (§6, §7.1–7.5) · v1.3: สรุปขอบเขตเริ่มพัฒนา — ของที่ยังไม่มี mockup แยกเป็น "สร้างจากสเปกได้เลย" กับ "เลื่อนไปเฟสถัดไป" (§1.1) · v1.2: เพิ่ม dialog เชิญด้วยอีเมล / ลิงก์เชิญที่สร้างแล้ว / โอนความเป็นเจ้าของ, ตาราง Admin แสดงอีเมลแทน username · v1.1: เพิ่ม Login / SetPassword / Admin 4 หน้า, ระบบใช้อีเมลอย่างเดียว เชิญด้วยอีเมลเท่านั้น, เผื่อปุ่ม Google เฟส 2)
 > เอกสารคู่กับ `design.md` (ระบบ/ข้อมูล/สิทธิ์/ค้นหา) — ไฟล์นี้สรุปฝั่งหน้าจอ
 > Mockup ต้นฉบับ: https://claude.ai/artifact/Ps8YdE6BGQuNejw8nkF1x7 (Design canvas "Dev Inventory — UI mockup")
 
@@ -13,9 +13,9 @@
 | artboard | หน้า | ใช้ API (ดู design.md §12) |
 |---|---|---|
 | `Main` | หน้าแรก | `GET /collections/tree`, `GET /items?sort=updated`, `GET /tags` |
-| `Search` | ผลค้นหา | `GET /search?q=&type=&tag=&lang=&in=` |
+| `Search` | ผลค้นหา | `GET /search?q=&kind=&tag=&lang=&in=` |
 | `Quick` | ค้นด่วน Ctrl+K | `GET /search/quick?q=` |
-| `Detail` | รายละเอียด Snippet/Script | `GET /items/:id`, `GET /items/:id/versions` |
+| `Detail` | รายละเอียดรายการ | `GET /items/:id`, `GET /items/:id/versions` |
 | `Editor` | สร้าง/แก้ไขรายการ | `POST /items`, `PUT /items/:id` (ส่ง `version`) |
 | `Dialog` | สิทธิ์ของรายการ | `PATCH /items/:id/visibility` |
 | `Login` | เข้าสู่ระบบ (ปกติ + error) | `POST /api/auth/sign-in/email`, `GET /auth/methods` |
@@ -36,14 +36,14 @@
 
 | ส่วนที่ต้องมี | สเปก |
 |---|---|
-| ถังขยะ | `DataTable` คอลัมน์ ชื่อ · ประเภท (`TypeChip`) · ลบโดย · ลบเมื่อ · "เหลืออีก N วัน" · ปุ่ม "กู้คืน" / "ลบถาวร" (ยืนยันก่อน) · เจ้าของเห็นของตัวเอง Admin เห็นของทุกคนที่ไม่ใช่ส่วนตัว (design.md §10.3) · ว่าง: "ถังขยะว่างเปล่า" |
+| ถังขยะ | `DataTable` คอลัมน์ ชื่อ · ป้าย (`KindChip`) · ลบโดย · ลบเมื่อ · "เหลืออีก N วัน" · ปุ่ม "กู้คืน" / "ลบถาวร" (ยืนยันก่อน) · เจ้าของเห็นของตัวเอง Admin เห็นของทุกคนที่ไม่ใช่ส่วนตัว (design.md §10.3) · ว่าง: "ถังขยะว่างเปล่า" |
 | History | หน้าเต็ม: ซ้ายรายการเวอร์ชัน (เวอร์ชัน · ใคร · เมื่อไหร่) ขวา diff แบบ side-by-side ของเวอร์ชันที่เลือกเทียบกับก่อนหน้า (ใช้ diff ของ CodeMirror merge หรือไลบรารี diff) · ปุ่ม "กู้เวอร์ชันนี้" สร้างเป็นเวอร์ชันใหม่ ไม่ลบประวัติ (§10.1) |
 | Dialog บันทึกชนกัน (409) | รูปแบบ dialog 560 ตามข้อความใน design.md §10.2: แจ้ง "มีคนแก้รายการนี้ระหว่างที่คุณแก้" + diff ย่อ + 3 ปุ่ม: ใช้ของล่าสุดแล้วแก้ใหม่ · บันทึกทับ · copy ของฉันเก็บไว้ก่อน |
 | Dialog ยืนยัน | ใช้ shell เดียวกับ `PermissionDialog`: ชื่อ + ประโยคบอกผลที่ตามมา + ยกเลิก / ปุ่มยืนยัน (ปุ่มทำลายใช้สีแดง `#fca5a5` ขอบแดงโปร่ง ไม่ใช้ accent) ใช้กับ: ปิดบัญชี (บอกว่า session หลุดทันที) · ยกเลิกคำเชิญ · ลบรายการ · ลบถาวร · เปลี่ยนบทบาท |
 | รีเซ็ตรหัสผ่าน | dialog ยืนยัน แล้วแสดงรหัสชั่วคราวครั้งเดียวในช่อง mono + ปุ่ม Copy (รูปแบบเดียวกับ `InviteResult`) และตั้ง `must_change_password` |
 | Error ของ dialog เชิญ | ข้อความแดงใต้ช่องอีเมล (`role="alert"`, `aria-describedby`): "รูปแบบอีเมลไม่ถูกต้อง" · "อีเมลนี้มีบัญชีอยู่แล้ว" · "อีเมลนี้มีคำเชิญค้างอยู่ ยกเลิกคำเชิญเดิมก่อน" |
-| หน้ารายละเอียด Note / Script / File / Link | ใช้โครง `Detail` เดิม เปลี่ยนเฉพาะพื้นที่เนื้อหา: **Note** = Markdown ที่ render แล้ว · **Script** = ช่อง "วิธีรัน" (mono + Copy) → ตาราง parameter (ชื่อ · คำอธิบาย · จำเป็น · ค่าเริ่มต้น) → OS/shell → `CodeBlock` · **File** = รายการไฟล์ + preview รูป/PDF · **Link** = URL + favicon + คำอธิบาย ปุ่ม "เปิดลิงก์" (`rel="noopener noreferrer"`) |
-| Editor ของแต่ละประเภท | ใช้ Editor เดิม ซ่อน/แสดงส่วนตามประเภท (Script เพิ่มฟอร์ม script_meta, Link เพิ่มช่อง URL, File ใช้ `Dropzone` เป็นหลัก) |
+| หน้ารายละเอียด | โครง `Detail` เดียวทุกรายการ (D22): ป้าย + สิทธิ์ → ชื่อ → summary → tag → เนื้อหา Markdown (code fence = `CodeBlock`) → ไฟล์แนบ |
+| Editor | Editor เดียวทุกรายการ: ป้ายเป็น checkbox เลือกได้หลายป้าย (อย่างน้อย 1) ไม่มีฟอร์มเฉพาะประเภท · ไฟล์แนบใช้ `Dropzone` ในคอลัมน์ขวา (สัปดาห์ 5) |
 | สถานะ empty / loading / error | loading = skeleton แถวสูงเท่าของจริง · empty = ไอคอน + ข้อความ 1 บรรทัด + ปุ่มทำสิ่งถัดไป (เช่น "สร้างรายการแรก") · error = `AlertBanner` + ปุ่ม "ลองใหม่" |
 | หน้า 404 / ไม่มีสิทธิ์ | ข้อความเดียว "ไม่พบรายการ หรือคุณไม่มีสิทธิ์เข้าถึง" + ปุ่มกลับหน้าแรก (ห้ามแยกสาเหตุ design.md §7.4) |
 | Quick search ก่อนพิมพ์ | แสดงรายการที่เปิดล่าสุด 5 รายการ (เก็บใน `localStorage` ของผู้ใช้ ต้องกรองด้วยสิทธิ์ตอนแสดงอีกชั้น) |
@@ -186,17 +186,17 @@ shadcn/ui: map `--background`→`--bg`, `--card`→`--sidebar`, `--popover`→`-
 | `AppShell`, `Sidebar`, `CollectionTree` | ตามหัวข้อ 4, tree ซ้อนไม่เกิน 3 ชั้น | ทุกหน้ายกเว้น Editor, Quick, Dialog |
 | `SearchTrigger` | ช่องค้นหาในแถบบน มี `kbd` "Ctrl K" กดแล้วเปิด palette | Main, Detail |
 | `SearchInput` | input จริง ขอบ accent เมื่อโฟกัส | Search |
-| `CreateMenu` | ปุ่ม "+ สร้างใหม่" (accent) เลือก Note / Snippet / Script / ไฟล์ / ลิงก์ | แถบบน |
-| `TypeChip` | chip mono 11px ขอบ `--border-strong` ข้อความตัวพิมพ์เล็ก: `note` `snippet` `script` `file` `link` | รายการ, ผลค้นหา, Detail |
+| `CreateButton` | ปุ่ม "+ สร้างใหม่" (accent) เปิด Editor ทันที (ไม่มีเมนูเลือกประเภท — D22) · `/new?kind=` ตั้งป้ายเริ่มต้นได้ | แถบบน, Collection |
+| `KindChip` | chip mono 11px ขอบ `--border-strong` ข้อความตัวพิมพ์เล็ก: `note` `snippet` `script` `link` (รายการหนึ่งแสดงได้หลาย chip) | รายการ, ผลค้นหา, Detail |
 | `VisibilityBadge` | ไอคอน + ข้อความ ตามตาราง §6 | รายการ, ผลค้นหา, Detail, Editor |
 | `TagChip` | พื้น `--surface-hover` ตัวอักษร secondary 12px radius 6 (ในกลุ่มกรองใช้ปุ่มสูง 36px + จำนวน) | ทุกหน้า |
-| `ItemRow` | แถวในลิสต์: chip ประเภท · ชื่อ · summary · tag · breadcrumb · สิทธิ์ · เจ้าของ+เวลา (ขวา) | Main |
+| `ItemRow` | แถวในลิสต์: chip ป้าย · ชื่อ · summary · tag · breadcrumb · สิทธิ์ · เจ้าของ+เวลา (ขวา) | Main |
 | `ResultCard` | ชื่อ (ไฮไลต์) · breadcrumb · ตัวอย่างข้อความหรือบรรทัด code พร้อมเลขบรรทัด · tag | Search |
 | `Highlight` | `<mark>` พื้น accent-soft ตัวอักษร accent radius 3 **ต้อง escape HTML ก่อน** ตามที่ server ส่ง (design.md §8.5) | Search, Quick |
 | `FacetList` | แถวสูง 36px ชื่อ + จำนวน (กรองตามสิทธิ์) | Search |
 | `CommandPalette` | ใช้ `cmdk` กว้าง 640 แถวสูง 56 แถวที่เลือกพื้น accent-soft ท้ายแถวมีไอคอน Enter · footer บอกปุ่มลัด (↑↓, Enter, Ctrl+Enter) | Quick |
-| `CodeBlock` | tab ชื่อไฟล์ (mono) · แถบบน "ภาษา · N บรรทัด" + Copy + Download · เลขบรรทัด · เลื่อนแนวนอนเมื่อยาว | Detail, Editor |
-| `CodeEditor` | CodeMirror 6 ธีมเดียวกับ CodeBlock · บรรทัดปัจจุบันพื้นขาวจาง 5% · เลือกภาษา (select) + ชื่อไฟล์ | Editor |
+| `CodeBlock` | code fence ใน Markdown: แถบบน "ภาษา · N บรรทัด" + Copy · เลขบรรทัด · เลื่อนแนวนอนเมื่อยาว (ชื่อไฟล์เขียนเป็นตัวหนาเหนือ block เอง) | Detail |
+| `CodeEditor` | CodeMirror 6 โหมด Markdown (highlight code fence ตามภาษา) ธีมเดียวกับ CodeBlock · บรรทัดปัจจุบันพื้นขาวจาง 5% | Editor |
 | `PermissionRadioGroup` | `fieldset` + radio จริง 4 ตัวเลือก: ตาม Collection / ส่วนตัว / ทีมดูได้ / ทีมแก้ไขได้ (ตัวเลือกที่เลือกขอบ+พื้น accent) | Editor, Dialog |
 | `PermissionDialog` | `role="dialog"` `aria-modal` กว้าง 560 + ข้อความเตือนเมื่อสิทธิ์ต่างจาก Collection | Dialog |
 | `TagInput` | ช่องรวม chip (× ลบ) + input autocomplete (กรองตามสิทธิ์) | Editor |
@@ -238,31 +238,31 @@ shadcn/ui: map `--background`→`--bg`, `--card`→`--sidebar`, `--popover`→`-
 ## 7. รายละเอียดแต่ละหน้า
 
 ### 7.1 หน้าแรก (`Main`)
-- ส่วน "สร้างใหม่": ปุ่มใหญ่ 5 ประเภท (ไอคอน accent + ชื่อ + คำอธิบายสั้น)
+- ปุ่ม "+ สร้างใหม่" ที่แถบบน (ไม่มีส่วนเลือกประเภทแล้ว — D22)
 - ซ้าย "แก้ไขล่าสุดในทีม": ลิสต์ในกรอบขอบ radius 12 แถวละหนึ่ง `ItemRow` + ลิงก์ "ดูทั้งหมด"
 - ขวา (กว้างสูงสุด 340): "ของฉันล่าสุด" (3 แถว ไอคอนสิทธิ์ + ชื่อ + เวลา) และ "Tag ที่ใช้บ่อย" (chip + จำนวน)
 - ข้อความใต้ H1: "แสดงเฉพาะรายการที่คุณมีสิทธิ์เห็น"
 
 ### 7.2 ผลค้นหา (`Search`)
 - H1 "พบ N รายการ" + ข้อความอธิบายคำค้น (AND) · ปุ่มเรียง "ความตรงกัน"
-- แถบกรองประเภทพร้อมจำนวน (ทั้งหมด / Snippet / Script / Note / Link) ปุ่มที่เลือกใช้ขอบ+พื้น accent
+- แถบกรองป้ายพร้อมจำนวน (ทั้งหมด / Snippet / Script / Note / Link — รายการที่มีหลายป้ายนับในทุกป้ายของมัน) ปุ่มที่เลือกใช้ขอบ+พื้น accent
 - ผลลัพธ์: ไฮไลต์ในชื่อ, ในข้อความตัวอย่าง และในบรรทัด code (แสดงเลขบรรทัดจริงของไฟล์) · breadcrumb ซ่อนเมื่อผู้ชมไม่มีสิทธิ์เห็น Collection (design.md §4.4-6)
-- คอลัมน์ขวา: Tag, ภาษา, กล่อง "ไวยากรณ์ค้นหา" (`tag:` `type:` `lang:` `"วลี"` `-คำ`)
+- คอลัมน์ขวา: Tag, ภาษา, กล่อง "ไวยากรณ์ค้นหา" (`tag:` `kind:` `lang:` `"วลี"` `-คำ`)
 - จำนวนทั้งหมด facet และตัวเลขต้องมาจาก query เดียวกับผล (design.md §8.4)
 
 ### 7.3 ค้นด่วน (`Quick`)
 - ตัวอย่างที่ใช้: พิมพ์ "user by id" แล้วเจอ `getUserById` (ต้องทำ `expand_identifiers` ตาม design.md §8.2)
 - Debounce 150ms · แสดง 8 รายการ · ก่อนพิมพ์แสดงรายการที่เปิดล่าสุด 5 รายการ (สเปก §1.1(ก))
 
-### 7.4 รายละเอียด Snippet (`Detail`)
-- ซ้าย: ชื่อ/summary/tag → CodeBlock (หลายไฟล์เป็น tab) → "วิธีใช้" (Markdown ที่ render แล้ว) → ไฟล์แนบ
+### 7.4 รายละเอียดรายการ (`Detail`)
+- ซ้าย: ป้าย + สิทธิ์ → ชื่อ/summary/tag → เนื้อหา Markdown (code fence แสดงเป็น `CodeBlock`) → ไฟล์แนบ
 - ขวา (กว้างสูงสุด 320): รายละเอียด (เจ้าของ วันที่ Collection), สิทธิ์ + ปุ่มเปลี่ยน, ประวัติล่าสุด (3 เวอร์ชัน)
-- Script ต้องเพิ่ม: ช่อง "วิธีรัน" พร้อมปุ่ม copy, ตาราง parameter, OS/shell (design.md §13)  (สเปก §1.1(ก))
+- ไม่มีส่วนเฉพาะประเภท: วิธีรัน/parameter/ลิงก์ ผู้ใช้เขียนใน Markdown เอง (D22)
 
 ### 7.5 Editor (`Editor`)
 - แถบบน: ปุ่มกลับ · ชื่อโหมด · สถานะ "เวอร์ชัน N · ยังไม่ได้บันทึก" · ยกเลิก · บันทึก (`Ctrl S`)
-- ซ้าย: ชื่อเรื่อง, คำอธิบายสั้น, โค้ด (tab + เพิ่มไฟล์), วิธีใช้ (Markdown)
-- ขวา (300–360): Collection picker, Tag, สิทธิ์ (ค่าเริ่มต้น "ตาม Collection"), ไฟล์แนบ
+- ซ้าย: ชื่อเรื่อง, คำอธิบายสั้น, เนื้อหา (Markdown ใน `CodeEditor` พร้อมตัวอย่าง code fence เป็น placeholder)
+- ขวา (300–360): ป้าย (checkbox 2×2), Collection picker, Tag, สิทธิ์ (ค่าเริ่มต้น "ตาม Collection"), ไฟล์แนบ
 - เมื่อบันทึกชนกัน (HTTP 409) ต้องมี dialog เลือก 3 ทาง ตาม design.md §10.2 (สเปก §1.1(ก))
 
 ### 7.6 Dialog สิทธิ์ (`Dialog`)
@@ -350,7 +350,7 @@ shadcn/ui: map `--background`→`--bg`, `--card`→`--sidebar`, `--popover`→`-
 | 1 | ติดตั้ง Next.js + Tailwind + shadcn, ตั้ง tokens §3.4, โหลดฟอนต์, ทำ `AppShell` + `Sidebar` (ข้อมูลตัวอย่างก่อน) |
 | 2 | `AuthCard`, `TextField`, `PasswordField`, Login, SetPassword (§7.7–7.8) + `AdminShell`, `DataTable`, `StatusPill`, `InviteLinkCard`, Admin › ผู้ใช้ (§7.9) + `InviteDialog`/`InviteResult` (§7.9.1) |
 | 3 | `CollectionTree`, `ItemRow`, หน้าแรก, Dialog/ตัวเลือกสิทธิ์ |
-| 4 | `CodeBlock`, `CodeEditor`, `TagInput`, Editor, Detail |
+| 4 | `CodeBlock` (code fence), `CodeEditor`, `TagInput`, `KindChip`, Editor เดียว, Detail |
 | 5 | `Dropzone`, ไฟล์แนบ, History + dialog กรณี 409 (สเปก §1.1) |
 | 6 | Search, `CommandPalette`, `Highlight`, `FacetList` |
 | 7 | ถังขยะ (สเปก §1.1), Admin › รายการส่วนตัว / Audit log / ตั้งค่า + `TransferDialog` (§7.10–7.12 ออกแบบแล้ว) |

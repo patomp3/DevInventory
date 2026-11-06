@@ -9,4 +9,4 @@ export const VIS_HELP: Record<Effective, string> = {
   workspace_view: "ทุกคนในทีมดูได้ เจ้าของ (และ Admin) แก้ได้",
   workspace_edit: "ทุกคนในทีมดูและแก้เนื้อหาได้",
 };
-export const TYPE_LABEL: Record<string, string> = { note: "Note", snippet: "Snippet", script: "Script", file: "File", link: "Link" };
+

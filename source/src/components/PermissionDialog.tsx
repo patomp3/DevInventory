@@ -51,7 +51,8 @@ export const API_ERR: Record<string, string> = {
   forbidden: "คุณไม่มีสิทธิ์ทำรายการนี้", not_found: "ไม่พบรายการ", max_depth: "Collection ซ้อนได้ไม่เกิน 3 ชั้น", cycle: "ย้ายเข้าไปอยู่ใต้ตัวเองไม่ได้",
   not_empty: "ลบได้เฉพาะ Collection ที่ว่าง (ย้ายหรือลบรายการข้างในก่อน)", top_level_cannot_inherit: "Collection ระดับบนสุดต้องตั้งสิทธิ์เอง",
   no_parent_to_inherit: "รายการใน Inbox ต้องตั้งสิทธิ์เอง", invalid_url: "URL ต้องขึ้นต้นด้วย http:// หรือ https://", title_required: "กรุณาใส่ชื่อเรื่อง",
-  validation: "ข้อมูลไม่ถูกต้อง",
+  validation: "ข้อมูลไม่ถูกต้อง", kind_required: "เลือกป้ายอย่างน้อย 1 ป้าย", invalid_kind: "ป้ายไม่ถูกต้อง",
+  body_too_large: "เนื้อหายาวเกินกำหนด (ไม่เกิน 500,000 ตัวอักษร)", too_many_tags: "ใส่ tag ได้ไม่เกิน 20 รายการ",
 };
 
 export async function api(url: string, method: string, body?: unknown) {

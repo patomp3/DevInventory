@@ -35,7 +35,7 @@ try {
     const title = sentence(3 + rnd(3));
     const st = buildSearchText({ title, summary: sentence(6), body: sentence(40 + rnd(60)), tagNames: [words[rnd(words.length)]!] });
     await client.query(
-      "INSERT INTO items (id, workspace_id, type, title, owner_id, visibility, effective_visibility, search_text) VALUES ($1,$2,'note',$3,$4,'workspace_view','workspace_view',$5)",
+      "INSERT INTO items (id, workspace_id, title, owner_id, visibility, effective_visibility, search_text) VALUES ($1,$2,$3,$4,'workspace_view','workspace_view',$5)",
       [randomUUID(), wsId, title, userId, st],
     );
   }

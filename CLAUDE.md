@@ -5,8 +5,8 @@
 
 ## เอกสารที่ต้องอ่านก่อนทำงาน
 
-- `docs/design.md` — ออกแบบระบบทั้งหมด (v1.2) **เป็นแหล่งความจริงหลัก**: ข้อกำหนด §3, สิทธิ์ §4, stack §5, ข้อมูล §6, permission engine §7, ค้นหา §8, API §12, ความปลอดภัย §14, แผน §17, Google login เฟส 2 §19, การตัดสินใจ D1–D21
-- `docs/ui-design.md` — UI spec (v1.3): tokens §3, โครงหน้า §4, รายละเอียดแต่ละหน้า §7, ลำดับสร้าง UI §10, ขอบเขตที่สร้างได้เลยเมื่อไม่มี mockup §1.1
+- `docs/design.md` — ออกแบบระบบทั้งหมด (v1.3) **เป็นแหล่งความจริงหลัก**: ข้อกำหนด §3, สิทธิ์ §4, stack §5, ข้อมูล §6, permission engine §7, ค้นหา §8, API §12, ความปลอดภัย §14, แผน §17, Google login เฟส 2 §19, การตัดสินใจ D1–D22 (**D22: รายการเป็น Note ชนิดเดียว + ป้าย kinds**)
+- `docs/ui-design.md` — UI spec (v1.4): tokens §3, โครงหน้า §4, รายละเอียดแต่ละหน้า §7, ลำดับสร้าง UI §10, ขอบเขตที่สร้างได้เลยเมื่อไม่มี mockup §1.1
 - ถ้าโค้ดขัดกับเอกสาร ให้ถามผู้ใช้ก่อนเปลี่ยนเอกสาร อย่าแก้เอกสารเงียบ ๆ
 
 ## Stack
@@ -22,8 +22,8 @@ Next.js 15 App Router (TypeScript, webpack) · Drizzle ORM + `pg` · PostgreSQL 
 | 1 | โครงโปรเจกต์, Docker, schema + migration, Thai search PoC | เสร็จ (PoC ผ่าน: `LIKE '%…%'` ภาษาไทยใช้ trigram index < 2 ms ที่ 60,000 แถว) |
 | 2 | Better Auth, เชิญด้วยอีเมล, Admin › ผู้ใช้, audit log | เสร็จ |
 | 3 | Collection tree + สืบทอดสิทธิ์, Note/Link CRUD, versions, 409, UI หลัก | เสร็จ |
-| 4 | Snippet/Script (CodeMirror 6, Shiki, หลาย code block), tag | **ถัดไป** |
-| 5 | ไฟล์แนบ, หน้า History + diff, dialog 409 | |
+| 4 | Editor Markdown + code fence (Shiki, Copy), ป้าย kinds (D22), tag | เสร็จ (ตรวจในเบราว์เซอร์แล้ว: สร้าง/แก้ Note หลายป้าย, code fence highlight + Copy, รายการที่แปลงจากข้อมูลเก่า) |
+| 5 | ไฟล์แนบ, หน้า History + diff, dialog 409 | **ถัดไป** |
 | 6 | ค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet | |
 | 7 | ถังขยะ, Admin › รายการส่วนตัว/audit log/ตั้งค่า, backup | |
 | 8 | ทดสอบตาม DoD, แก้บั๊ก, เอกสาร, deploy | |
@@ -36,12 +36,16 @@ Next.js 15 App Router (TypeScript, webpack) · Drizzle ORM + `pg` · PostgreSQL 
 src/lib/permissions/   จุดเดียวที่ตัดสินสิทธิ์: canView/canEdit/canManage/canTransfer, resolveEffective, visibleItemsWhere
 src/lib/search/        normalize, expandIdentifiers, buildSearchText, parseQuery, likePattern
 src/lib/collections.ts tree + CRUD + recomputeSubtree (สืบทอด effective_visibility)
-src/lib/items.ts       รายการ: create/update(409)/move/visibility/delete, listItems, getItemDetail
+src/lib/items.ts       รายการ: create/update(409)/move/visibility/delete, listItems(type/tag), getItemDetail(codeBlocks, tags)
+src/lib/item-content.ts pure: KINDS/KIND_LABEL, normalizeKinds, prepareContent, normalizeTag(s), LIMITS (body ≤ 500,000 ตัวอักษร, tag ≤ 20)
+src/lib/item-schema.ts zod body ของ POST/PUT items  ·  src/lib/tags.ts  replaceItemTags, tagsForItems, listTags (ผ่าน visibleItemsWhere)
+src/lib/highlight.ts   Shiki highlighter ตัวเดียว (JS regex engine, ธีมเองตาม ui-design §3.1) ใช้ผ่าน @shikijs/rehype ใน MarkdownView
 src/lib/auth/          Better Auth config (lazy), session helper, password policy
 src/lib/api.ts         userRoute()/requireAdmin() — ตรวจ Origin(CSRF) + session + แปลง AppError → HTTP
 src/lib/audit.ts       เขียน audit_logs   ·  src/lib/errors.ts  AppError, notFound
 src/lib/db/schema.ts   Drizzle schema (ต้องตรงกับ drizzle/*.sql)
-src/app/api/v1/…       REST: auth, admin/{users,invites}, collections, items
+src/app/api/v1/…       REST: auth, admin/{users,invites}, collections, items, tags
+src/components/        MarkdownView (server, MarkdownAsync: sanitize → Shiki) + CodePre (Copy), CodeEditor (CodeMirror 6 โหมด Markdown), TagInput, KindChips, ItemEditor (Editor เดียว)
 src/app/(app)/…        หน้าหลังล็อกอิน (layout ตรวจ session + sidebar tree)
 drizzle/*.sql          migration แบบ SQL ล้วน รันด้วย scripts/migrate.ts ตามชื่อไฟล์
 scripts/               migrate, seed, doctor, poc-thai-search, e2e-auth.sh, e2e-items.sh
@@ -88,24 +92,30 @@ npm run dev                      # http://localhost:3000
 
 ## ทดสอบ
 
-- `npm test` (Vitest, 38 เคส: permission matrix, search, password policy) · `npm run typecheck` · `npm run build`
-- e2e (ต้องมีเซิร์ฟเวอร์รันอยู่ + DB ที่ seed แล้ว + `psql`; เขียนเป็น bash — บน Windows ใช้ Git Bash/WSL): `scripts/e2e-auth.sh` (login lockout, เชิญ, รีเซ็ตรหัส, ปิดบัญชี) และ `scripts/e2e-items.sh` (สิทธิ์/สืบทอด/409/ความลึก 35 เช็ก) ปรับตัวแปร `B`, `PSQL`, `ADMIN_PW` ท้าย/ต้นไฟล์ให้ตรงกับเครื่อง
+- `npm test` (Vitest, 54 เคส: permission matrix, search, password policy, item-content (ป้าย/tag)) · `npm run typecheck` · `npm run build`
+- e2e (ต้องมีเซิร์ฟเวอร์รันอยู่ + DB ที่ seed แล้ว + `psql`; เขียนเป็น bash — บน Windows ใช้ Git Bash/WSL): `scripts/e2e-auth.sh` (login lockout, เชิญ, รีเซ็ตรหัส, ปิดบัญชี) และ `scripts/e2e-items.sh` (สิทธิ์/สืบทอด/409/ความลึก + ป้าย/tag/Markdown) ตั้งตัวแปร env `B`, `PSQL`, `ADMIN_EMAIL`, `ADMIN_PW`, `MEMBER_EMAIL`, `PY` ให้ตรงกับเครื่อง — บนเครื่องนี้: `PY=python` (python3 เป็นแค่ stub ของ Store), `PSQL="docker exec -i source-db-1 psql -U inventory inventory"`, `B=http://localhost:3100`
+- e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-05 หลัง D22: 56/56 ผ่าน) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน
 - เพิ่มเทสต์ทุกครั้งที่แตะ permission engine; ทุก endpoint ใหม่ต้องมีเคส "ไม่มีสิทธิ์ → 404" และ "ข้าม workspace"
-- ยังไม่มีเทส UI/Playwright (อยู่ในแผนสัปดาห์ 8) — หน้าจอที่ทำไปแล้ว **ยังไม่เคยตรวจด้วยตาในเบราว์เซอร์** ควรเปิดดูและแก้รายละเอียดเทียบ ui-design
+- ยังไม่มีเทส UI/Playwright (อยู่ในแผนสัปดาห์ 8) — หน้า Editor/Detail/หน้าแรก ตรวจในเบราว์เซอร์แล้ว แต่หน้า Login/Admin/Collection ของสัปดาห์ 2–3 ยังไม่ได้ไล่ดูละเอียดเทียบ ui-design
+- พอร์ต 3000 บนเครื่องนี้มีบริการอื่น (Gotenberg) จับอยู่ — `.claude/launch.json` รัน dev ที่ **3100**
+- **ห้ามรัน `next dev` สองตัวพร้อมกันในโฟลเดอร์ `source/`** (ใช้ `.next` ร่วมกัน → chunk 404 / หน้าเว็บพัง) ถ้าเกิดแล้ว: ปิดทุกตัว `rm -rf .next` แล้วเปิดใหม่ตัวเดียว
 
-## งานสัปดาห์ 4 (ถัดไป) — แนวทาง
+## รูปแบบรายการ (D22) — ข้อควรรู้
 
-- เปิดชนิด `snippet`, `script` ใน `AVAILABLE_TYPES` (`src/lib/items.ts`); ใช้ตาราง `item_code_blocks` (มีแล้ว), `script_meta` jsonb `{shell, os[], params[], run_example}`
-- Editor: CodeMirror 6 (หลาย code block ต่อรายการ ตั้งชื่อไฟล์/ภาษาได้), แสดงผลด้วย Shiki (theme เองตามสี ui-design §3.1), CSP ต้องไม่ใช้ inline script
-- tag: ตาราง `tags` (slug lowercase)/`item_tags`; autocomplete ต้องแสดงเฉพาะ tag ที่ผูกกับรายการที่ผู้ใช้ "มีสิทธิ์เห็น" (design §8.7 กัน tag จากรายการ private รั่ว)
-- ต้องอัปเดตให้ครบ: `buildSearchText` (ใส่ code/ชื่อไฟล์/tag, จำกัด 200 KB), snapshot ใน `item_versions` (codeBlocks, tags), `updateItem` (optimistic lock เดิม), หน้า detail และ editor ของแต่ละชนิดตาม ui-design §1.1(ก)
-- ทำทีละชิ้นเล็ก ๆ: schema/service → API → UI → test
+- รายการทุกชิ้นเป็น Note: `title`, `summary`, `body` (Markdown), `kinds` (text[] ⊆ note/snippet/script/link, ≥ 1), tag, (ไฟล์แนบ สัปดาห์ 5 อยู่ใต้ Note) — **ไม่มี** `type`, `url`, `script_meta`, ตาราง `item_code_blocks` แล้ว (ลบใน `0003_note_kinds.sql` หลังแปลงข้อมูลเก่าเป็น Markdown)
+- โค้ดอยู่ใน code fence ของ body: แสดงผลด้วย `MarkdownView` (rehype-sanitize **ก่อน** แล้วจึง Shiki) + `CodePre` (แถบภาษา · N บรรทัด + Copy)
+- API: `POST/PUT /items` รับ `kinds` (ไม่ส่ง = `["note"]`), `GET /items?kind=` · ป้ายเรียงตามลำดับ KINDS และไม่ซ้ำ
+- `PUT /items/:id` แทนที่ทั้งก้อน: ไม่ส่ง `tags` = ลบ tag ทั้งหมด, ไม่ส่ง `kinds` = กลับเป็น `["note"]` (Editor ส่งครบเสมอ)
+- snapshot ใน `item_versions` ก่อน D22 ยังมีรูปแบบเก่า (`url`/`scriptMeta`/`codeBlocks` ไม่มี `kinds`) — หน้า History (สัปดาห์ 5) ต้องรองรับทั้งสองแบบ
+- tag ใช้ร่วมทั้ง workspace (unique `workspace_id+slug`); ชื่อที่แสดงคือชื่อที่พิมพ์ครั้งแรก · `listTags` แสดงเฉพาะที่ผูกกับรายการที่มองเห็น · เรียงด้วย collation th-TH (ไทยมาก่อน)
+- Shiki คืน HTML ที่มี `style` inline และ CodeMirror inject `<style>` — ตอนใส่ CSP strict ต้องอนุญาต `style-src 'unsafe-inline'` หรือใช้ nonce/class
+- หน้า `/tags/[slug]` เป็นลิสต์ชั่วคราว จะถูกแทนด้วยหน้าค้นหา `tag:` ในสัปดาห์ 6 · ตัวกรอง `lang:` ในสัปดาห์ 6 ให้หาจาก code fence ใน body (`` ```bash ``)
 
 ## ช่องว่างที่รู้อยู่แล้ว (ทำตอนถึงสัปดาห์ที่เกี่ยวข้อง)
 
 - dialog ย้ายรายการเตือนแบบรวม ๆ ยังไม่แยกกรณี "สิทธิ์เปิดกว้างขึ้น" (design §4.4.4)
 - ลบรายการ = soft delete เท่านั้น ยังไม่มีหน้าถังขยะ/กู้คืน (สัปดาห์ 7); ยังไม่มีหน้า History และ dialog 409 แบบเต็ม (สัปดาห์ 5 — ตอนนี้เป็น dialog ง่าย ๆ ใน `ItemEditor`)
-- ยังไม่มี endpoint `/me`, `/auth/methods`, `/tags`, `/trash`, `/search`, admin `private-items`/`audit-logs`/`settings`/transfer
+- ยังไม่มี endpoint `/me`, `/auth/methods`, `/trash`, `/search`, admin `private-items`/`audit-logs`/`settings`/transfer
 - ตรรกะ `canTransfer` มีและทดสอบแล้ว แต่ยังไม่มี endpoint/หน้าจอ (TransferDialog ออกแบบไว้แล้วในแคนวาส)
 - แอปตั้ง `X-Frame-Options` ฯลฯ เบื้องต้นใน `next.config.ts`; CSP แบบ strict ยังไม่ได้ใส่
 - Dockerfile/compose ผ่านการเขียนแล้วแต่ **ยังไม่เคย build จริง** (service `migrate` ใช้ stage `build`); backup (restic) อยู่สัปดาห์ 7

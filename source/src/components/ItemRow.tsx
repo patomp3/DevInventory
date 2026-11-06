@@ -1,16 +1,18 @@
 import Link from "next/link";
+import { KindChips } from "@/components/KindChips";
+import { TagChips } from "@/components/TagChips";
 import { VisibilityBadge } from "@/components/VisibilityBadge";
 import type { ItemSummary } from "@/lib/items";
-import { TYPE_LABEL } from "@/lib/visibility-labels";
 
 export function ItemRow({ item }: { item: ItemSummary }) {
   return (
     <li>
       <Link href={`/i/${item.id}`} className="flex min-h-14 items-center gap-3 rounded-lg border-b border-[var(--border-row)] px-3 py-2.5 hover:bg-surface-hover">
-        <span className="rounded-md border border-[var(--border-strong)] px-1.5 py-0.5 font-mono text-[11px] text-text-2">{TYPE_LABEL[item.type]}</span>
+        <KindChips kinds={item.kinds} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15px] font-medium">{item.title}</div>
           {item.summary && <div className="truncate text-xs text-muted">{item.summary}</div>}
+          {item.tags.length > 0 && <div className="mt-1"><TagChips tags={item.tags.slice(0, 5)} link={false} /></div>}
         </div>
         <VisibilityBadge value={item.effectiveVisibility} />
         <div className="hidden w-40 text-right text-xs text-muted sm:block">

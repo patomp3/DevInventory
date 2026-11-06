@@ -1,0 +1,7 @@
+# ไฟล์ส่วนตัว/ชั่วคราวที่ไม่ควรขึ้น repo (repo นี้เป็น public)
+Claude outputs/
+*.dump
+*.jar
+.env
+.env.*
+!.env.example

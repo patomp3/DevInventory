@@ -1,6 +1,7 @@
 # Dev Inventory — System Design
 
-> สถานะ: Draft v1.2 · วันที่ 2026-11-05
+> สถานะ: Draft v1.3 · วันที่ 2026-11-05
+> v1.3: **D22** รายการทุกชิ้นเป็น Note ชนิดเดียว เนื้อหาเป็น Markdown ทั้งหมด ประเภทเดิมกลายเป็น "ป้าย" (kinds) เลือกได้หลายป้าย ไฟล์แนบอยู่ใต้ Note (§3, §6, §8, §12, §13, §17)
 > v1.2: เพิ่ม dialog เชิญด้วยอีเมล / โอนความเป็นเจ้าของ ใน §13.1
 > v1.1: เพิ่มรายละเอียดหน้า Login / SetPassword / Admin (§13.1), ออกแบบรองรับ Login ด้วย Google ในเฟส 2 (§19, D16–D20) และเตรียมจุดเชื่อมไว้ในเฟส 1
 > UI mockup + สเปกหน้าจอ: ดู `ui-design.md`
@@ -51,6 +52,7 @@
 | D19 | ทางหนีไฟ (break-glass) | ต้องมี Workspace Admin อย่างน้อย 1 คนที่ใช้รหัสผ่านได้เสมอ ระบบไม่ยอมให้ปิดวิธีสุดท้ายของผู้ใช้ หรือปิดรหัสผ่านของ Admin คนสุดท้าย |
 | D20 | เตรียมไว้ในเฟส 1 | สร้างคอลัมน์ตั้งค่า login method, ใช้ตาราง `account` ของ Better Auth, หน้า Login อ่านปุ่มจาก `/auth/methods`, audit log เก็บ `method` ไว้ตั้งแต่เฟส 1 เพื่อให้เฟส 2 ไม่ต้อง migrate ข้อมูลเดิม |
 | D21 | อีเมลเป็นตัวตนเดียว | ผู้ใช้ระบุตัวตนด้วยอีเมลอย่างเดียว **ไม่มี username** · คำเชิญต้องระบุอีเมลเสมอ และผู้รับตั้งรหัสผ่านได้เฉพาะอีเมลตามคำเชิญ (แก้ไม่ได้) · ไม่มีวิธีสมัครเอง ทั้งผ่านรหัสผ่านและ Google · อีเมลที่มีบัญชีอยู่แล้ว (รวมบัญชีที่ปิด) เชิญซ้ำไม่ได้ |
+| D22 | รูปแบบรายการ | **รายการทุกชิ้นเป็น "Note" ชนิดเดียว** (ชื่อ, คำอธิบายสั้น, เนื้อหา Markdown, tag, ไฟล์แนบ) โค้ด/ลิงก์/วิธีรันเขียนใน Markdown เอง (code fence ```lang) · ประเภทเดิมกลายเป็น **ป้าย** `kinds` = note / snippet / script / link เลือกได้หลายป้าย อย่างน้อย 1 ป้าย ใช้กรองและค้นหา · ไม่มีฟอร์มเฉพาะประเภท (หลายไฟล์, script_meta, URL) และไม่มีประเภท File — ไฟล์แนบอยู่ใต้ Note · เหตุผล: ลดความซับซ้อนของ editor/ข้อมูล ผู้ใช้จัดรูปเนื้อหาเองได้ยืดหยุ่นกว่า |
 
 ---
 
@@ -59,7 +61,7 @@
 ### เฟส 1 — MVP
 - Login ด้วยอีเมล + password, บทบาท 3 ระดับ, การเชิญด้วยอีเมล (ไม่มีการสมัครเอง)
 - เตรียมจุดเชื่อมสำหรับ Google login (§19.8) แต่ยังไม่เปิดปุ่ม
-- รายการ 5 ประเภท: Note, Snippet, Script, File, Link
+- รายการแบบ Note ชนิดเดียว (D22) เนื้อหา Markdown + code fence ที่มี highlight/Copy · ติดป้าย note / snippet / script / link ได้หลายป้าย · ไฟล์แนบอยู่ใต้ Note
 - Collection (ไม่เกิน 3 ชั้น) + Tag
 - สิทธิ์ 3 ระดับ (D4) พร้อมการสืบทอดจาก Collection
 - การค้นหา: ไทย/อังกฤษ/code, ตัวกรอง, ไวยากรณ์ค้นหา, highlight, Ctrl+K
@@ -208,7 +210,6 @@ erDiagram
   collections ||--o{ collections : parent
   collections ||--o{ items : contains
   users ||--o{ items : owns
-  items ||--o{ item_code_blocks : has
   items ||--o{ attachments : has
   items ||--o{ item_versions : history
   items ||--o{ item_tags : tagged
@@ -228,7 +229,6 @@ erDiagram
 -- ประเภทข้อมูล
 CREATE TYPE visibility_setting AS ENUM ('inherit','private','workspace_view','workspace_edit');
 CREATE TYPE visibility_effective AS ENUM ('private','workspace_view','workspace_edit');
-CREATE TYPE item_type AS ENUM ('note','snippet','script','file','link');
 CREATE TYPE workspace_role AS ENUM ('admin','member');
 
 CREATE TABLE workspaces (
@@ -289,12 +289,10 @@ CREATE TABLE items (
   id uuid PRIMARY KEY,
   workspace_id uuid NOT NULL REFERENCES workspaces(id),
   collection_id uuid REFERENCES collections(id), -- NULL = Inbox
-  type item_type NOT NULL,
   title text NOT NULL,
   summary text,                                  -- คำอธิบายสั้น
-  body text,                                     -- Markdown (note, คำอธิบาย snippet, วิธีใช้ script)
-  url text,                                      -- สำหรับ link
-  script_meta jsonb,                             -- {shell, os[], params:[{name,desc,required,default}], run_example}
+  body text,                                     -- Markdown ทั้งหมด รวมโค้ด (```lang), ลิงก์, วิธีรัน (D22) ไม่เกิน 500,000 ตัวอักษร
+  kinds text[] NOT NULL DEFAULT '{note}',        -- ป้าย (D22): ⊆ {note,snippet,script,link}, อย่างน้อย 1
   owner_id uuid NOT NULL REFERENCES users(id),
   visibility visibility_setting NOT NULL DEFAULT 'inherit',
   effective_visibility visibility_effective NOT NULL,
@@ -303,17 +301,11 @@ CREATE TABLE items (
   updated_by uuid REFERENCES users(id),
   deleted_at timestamptz,
   deleted_by uuid REFERENCES users(id),
-  CHECK (collection_id IS NOT NULL OR visibility <> 'inherit')
+  CHECK (collection_id IS NOT NULL OR visibility <> 'inherit'),
+  CHECK (cardinality(kinds) >= 1 AND kinds <@ ARRAY['note','snippet','script','link'])
 );
 
-CREATE TABLE item_code_blocks (                  -- snippet หลายไฟล์ / script
-  id uuid PRIMARY KEY,
-  item_id uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
-  filename text,                                 -- เช่น docker-compose.yml
-  language text NOT NULL,                        -- shiki language id
-  content text NOT NULL,
-  sort_order int NOT NULL DEFAULT 0
-);
+-- (เดิมมีตาราง item_code_blocks และ type item_type — ลบใน migration 0003 ตาม D22 โดยแปลงเนื้อหาเป็น Markdown ใน body ก่อน)
 
 CREATE TABLE attachments (
   id uuid PRIMARY KEY,
@@ -346,7 +338,7 @@ CREATE TABLE item_versions (
   id uuid PRIMARY KEY,
   item_id uuid NOT NULL REFERENCES items(id) ON DELETE CASCADE,
   version int NOT NULL,
-  snapshot jsonb NOT NULL,                       -- title, summary, body, url, script_meta, code_blocks, tags
+  snapshot jsonb NOT NULL,                       -- title, summary, body, kinds, tags (snapshot ก่อน D22 มี url/script_meta/code_blocks แทน kinds)
   edited_by uuid NOT NULL REFERENCES users(id),
   created_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (item_id, version)
@@ -405,6 +397,7 @@ CREATE EXTENSION IF NOT EXISTS citext;
 CREATE INDEX items_acl_idx      ON items (workspace_id, effective_visibility, owner_id) WHERE deleted_at IS NULL;
 CREATE INDEX items_collection   ON items (collection_id) WHERE deleted_at IS NULL;
 CREATE INDEX items_updated      ON items (workspace_id, updated_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX items_kinds        ON items USING gin (kinds) WHERE deleted_at IS NULL;   -- ตัวกรองป้าย (D22)
 CREATE INDEX items_search_trgm  ON items USING gin (search_text gin_trgm_ops);
 CREATE INDEX items_title_trgm   ON items USING gin (lower(title) gin_trgm_ops);
 CREATE INDEX tags_slug_trgm     ON tags  USING gin (slug gin_trgm_ops);
@@ -477,7 +470,7 @@ predicate นี้สร้างจาก function `visibleItemsWhere(ctx)` �
 ## 8. การค้นหา (Search)
 
 ### 8.1 ความต้องการ
-- ค้นจากชื่อเรื่อง, คำอธิบาย, เนื้อหา Markdown, code, ชื่อไฟล์ใน code block, ชื่อไฟล์แนบ, tag, URL
+- ค้นจากชื่อเรื่อง, คำอธิบาย, เนื้อหา Markdown (รวมโค้ดใน code fence และ URL ที่เขียนในเนื้อหา), ชื่อไฟล์แนบ, tag
 - ค้นภาษาไทยที่ไม่มีช่องว่างได้ (เช่น "ติดตั้ง" เจอใน "วิธีติดตั้งระบบ")
 - ค้นชื่อใน code ได้ เช่น `getUserById`, `docker-compose`, `snake_case`, `.env`
 - พิมพ์ผิดเล็กน้อยยังมีผลแนะนำ
@@ -490,15 +483,14 @@ predicate นี้สร้างจาก function `visibleItemsWhere(ctx)` �
 ```
 search_text = normalize(
   title + ' ' + summary + ' ' + strip_markdown(body) + ' ' +
-  url + ' ' + code_blocks.filename + ' ' + code_blocks.content + ' ' +
   attachments.original_name + ' ' + tags.name + ' ' +
-  expand_identifiers(code + title)
+  expand_identifiers(strip_markdown(body) + title)
 )
 ```
 
 - `normalize`: Unicode NFC, lowercase, ตัด zero-width space (U+200B) ซึ่งเจอบ่อยในข้อความไทยที่ copy มา, รวม whitespace
 - `expand_identifiers`: แตก `getUserById` เป็น `get user by id` และ `snake_case` เป็น `snake case` แล้วเติมต่อท้าย ทำให้ค้น "user by id" แล้วเจอ
-- จำกัดขนาด code ที่นำเข้า index ไม่เกิน 200 KB ต่อรายการ
+- จำกัดขนาดเนื้อหา (หลัง strip markdown) ที่นำเข้า index ไม่เกิน 200 KB ต่อรายการ
 
 ### 8.3 ไวยากรณ์ค้นหา
 
@@ -508,8 +500,8 @@ search_text = normalize(
 | `"docker compose up"` | วลีที่ตรงทั้งหมด |
 | `-test` | ไม่เอารายการที่มีคำนี้ |
 | `tag:docker` | กรองตาม tag (หลายตัว = AND) |
-| `type:script` | note, snippet, script, file, link |
-| `lang:bash` | ภาษาของ code block |
+| `kind:script` (หรือ `type:`) | ป้ายของรายการ: note, snippet, script, link (มีหลายป้าย = รายการที่มีป้ายนั้น) |
+| `lang:bash` | มี code fence ภาษานั้นในเนื้อหา (` ```bash `) |
 | `in:"Project X"` | อยู่ใน Collection นี้ (รวม sub-collection) |
 | `owner:me` | เฉพาะของฉัน |
 | `is:private` | เฉพาะรายการส่วนตัวของฉัน |
@@ -646,7 +638,7 @@ UI เมื่อได้ 409: แจ้งว่า "มีคนแก้ร
 | — | `/api/auth/sign-in/social`, `/api/auth/callback/google` | *(เฟส 2)* จัดการโดย Better Auth ไม่ใช่ `/api/v1` |
 | GET | `/collections/tree` | tree + จำนวนที่มองเห็นได้ |
 | POST / PATCH / DELETE | `/collections[/:id]` | PATCH ใช้แก้ชื่อ ลำดับ ย้าย parent และสิทธิ์ (ต้อง canManage) |
-| GET | `/items?collection=&type=&tag=&sort=&cursor=` | list |
+| GET | `/items?collection=&kind=&tag=&sort=&cursor=` | list (`kind` = ป้าย D22) |
 | POST | `/items` | สร้าง |
 | GET | `/items/:id` | รายละเอียด + `permissions: {canEdit, canManage}` |
 | PUT | `/items/:id` | แก้เนื้อหา (ต้องส่ง `version`) |
@@ -656,7 +648,7 @@ UI เมื่อได้ 409: แจ้งว่า "มีคนแก้ร
 | GET | `/items/:id/versions` · GET `/items/:id/versions/:v` · POST `/items/:id/versions/:v/restore` | ประวัติ |
 | POST | `/items/:id/attachments` · DELETE `/attachments/:id` | |
 | GET | `/attachments/:id/download` | ตรวจสิทธิ์ทุกครั้ง |
-| GET | `/search?q=&type=&tag=&lang=&in=&page=` | ผล + total + facets |
+| GET | `/search?q=&kind=&tag=&lang=&in=&page=` | ผล + total + facets |
 | GET | `/search/quick?q=` | Ctrl+K |
 | GET | `/tags?prefix=` | autocomplete (กรองตามสิทธิ์) |
 | GET | `/trash` | |
@@ -673,16 +665,13 @@ UI เมื่อได้ 409: แจ้งว่า "มีคนแก้ร
 |---|---|
 | **Login** | อีเมล + password + ปุ่มแสดงรหัส · ข้อความ error เดียวกันทุกกรณี · แจ้งล็อก 15 นาที · เฟส 2 เพิ่มปุ่ม Google (§19.6) · บังคับเปลี่ยนรหัสถ้า `must_change_password` |
 | **SetPassword (รับคำเชิญ)** | ชื่อที่แสดง, อีเมล (อ่านอย่างเดียว จากคำเชิญ), รหัสผ่านใหม่ + ยืนยัน, กฎรหัสผ่านแบบ checklist · เฟส 2 เพิ่มทางเลือก "ดำเนินการต่อด้วย Google" |
-| **Layout หลัก** | Sidebar: Collection tree (ไม่เกิน 3 ชั้น) + จำนวน, Inbox, "ของฉัน", ถังขยะ · Top bar: ช่องค้นหา (Ctrl+K), ปุ่ม "+ สร้าง" (เลือกประเภท) |
+| **Layout หลัก** | Sidebar: Collection tree (ไม่เกิน 3 ชั้น) + จำนวน, Inbox, "ของฉัน", ถังขยะ · Top bar: ช่องค้นหา (Ctrl+K), ปุ่ม "+ สร้างใหม่" (เปิด Editor เดียว ไม่ต้องเลือกประเภท — D22) |
 | **Home** | รายการที่แก้ล่าสุดใน Workspace, ของฉันล่าสุด, tag ยอดนิยม (กรองตามสิทธิ์) |
-| **Collection** | รายการแบบ card หรือ list, ตัวกรองประเภท/tag, เรียงตามวันที่/ชื่อ, ปุ่มตั้งค่า Collection (ชื่อ ไอคอน สิทธิ์) |
-| **Card ของรายการ** | ไอคอนประเภท, ชื่อ, summary, tag, ไอคอนสิทธิ์ (🔒 / 👥 / ✏️), เจ้าของ, วันที่แก้ล่าสุด |
-| **รายละเอียดรายการ** | breadcrumb, ไอคอนสิทธิ์ + ข้อความอธิบาย (เช่น "ทุกคนในทีมดูได้ · สืบทอดจาก Project X"), เนื้อหาตามประเภท, ไฟล์แนบ, ปุ่ม แก้ไข / ประวัติ / ย้าย / สิทธิ์ / ลบ (แสดงตามสิทธิ์จาก API) |
-| ↳ Snippet | หลาย code block พร้อม tab ชื่อไฟล์, highlight, ปุ่ม Copy ต่อ block, ปุ่ม Download |
-| ↳ Script | ช่อง "วิธีรัน" พร้อมปุ่ม copy, ตาราง parameter, OS / shell, code |
-| ↳ Link | URL พร้อม favicon, คำอธิบาย |
-| ↳ File | รายการไฟล์ + preview รูป/PDF (ใช้ viewer ของ browser) |
-| **Editor** | ชื่อ, summary, Collection picker, tag input (autocomplete), เลือกสิทธิ์ (ค่าเริ่มต้น "ตาม Collection"), CodeMirror สำหรับ Markdown/code + preview, ลาก-วางไฟล์, Ctrl+S บันทึก, แจ้งเตือนก่อนปิดถ้ายังไม่บันทึก |
+| **Collection** | รายการแบบ card หรือ list, ตัวกรองป้าย/tag, เรียงตามวันที่/ชื่อ, ปุ่มตั้งค่า Collection (ชื่อ ไอคอน สิทธิ์) |
+| **Card ของรายการ** | ป้าย (kinds), ชื่อ, summary, tag, ไอคอนสิทธิ์ (🔒 / 👥 / ✏️), เจ้าของ, วันที่แก้ล่าสุด |
+| **รายละเอียดรายการ** | breadcrumb, ไอคอนสิทธิ์ + ข้อความอธิบาย (เช่น "ทุกคนในทีมดูได้ · สืบทอดจาก Project X"), ป้าย, เนื้อหา Markdown, ไฟล์แนบ, ปุ่ม แก้ไข / ประวัติ / ย้าย / สิทธิ์ / ลบ (แสดงตามสิทธิ์จาก API) |
+| ↳ เนื้อหา | Markdown ที่ sanitize แล้ว · code fence: highlight ด้วย Shiki, เลขบรรทัด, แถบ "ภาษา · N บรรทัด" + ปุ่ม Copy ต่อ block · URL ในเนื้อหากลายเป็นลิงก์อัตโนมัติ (`rel="noopener noreferrer nofollow"`) |
+| **Editor** | Editor เดียวทุกรายการ: ชื่อ, summary, ป้าย (checkbox เลือกได้หลายป้าย), เนื้อหา Markdown (CodeMirror), Collection picker, tag input (autocomplete), เลือกสิทธิ์ (ค่าเริ่มต้น "ตาม Collection"), CodeMirror สำหรับ Markdown/code + preview, ลาก-วางไฟล์, Ctrl+S บันทึก, แจ้งเตือนก่อนปิดถ้ายังไม่บันทึก |
 | **Dialog สิทธิ์** (เฟส 1) | radio: ตาม Collection / ส่วนตัว / ทีมดูได้ / ทีมแก้ไขได้ + เตือนเมื่อเปิดกว้างกว่า Collection แม่ |
 | **ผลค้นหา** | ช่องค้นหา + chips ตัวกรอง, จำนวนผลลัพธ์, facet ด้านข้าง, ผลแบบมี highlight และ breadcrumb, "คุณหมายถึง…" |
 | **History** | timeline เวอร์ชัน, diff, ปุ่มกู้คืน |
@@ -820,12 +809,12 @@ volumes: { files: {}, pgdata: {}, caddy: {} }
 ### 16.2 ทดสอบการค้นหา
 - คำไทยกลางประโยค ("ติดตั้ง" ใน "วิธีติดตั้งระบบ"), คำไทยสั้น 2 ตัวอักษร
 - `getUserById`, "user by id", `docker-compose`, `.env`
-- วลีในเครื่องหมายคำพูด, การตัดคำด้วย `-`, `tag:` + `type:` ร่วมกัน
+- วลีในเครื่องหมายคำพูด, การตัดคำด้วย `-`, `tag:` + `kind:` ร่วมกัน
 - พิมพ์ผิด ("dokcer") → ได้ "คุณหมายถึง docker"
 - ความเร็ว: p95 < 300 ms กับข้อมูลทดสอบ 50,000 รายการ
 
 ### 16.3 E2E (Playwright)
-login → สร้าง Collection → สร้าง Snippet พร้อมไฟล์แนบ → ค้นเจอ → B ดูได้แต่แก้ไม่ได้ → เปลี่ยนเป็น workspace_edit → B แก้ได้ → ดูประวัติ → กู้เวอร์ชัน → ลบ → กู้จากถังขยะ
+login → สร้าง Collection → สร้าง Note ป้าย snippet พร้อมไฟล์แนบ → ค้นเจอ → B ดูได้แต่แก้ไม่ได้ → เปลี่ยนเป็น workspace_edit → B แก้ได้ → ดูประวัติ → กู้เวอร์ชัน → ลบ → กู้จากถังขยะ
 
 ### 16.4 DoD เฟส 1
 - [ ] ฟีเจอร์ในหัวข้อ 3 (เฟส 1) ครบ
@@ -844,8 +833,8 @@ login → สร้าง Collection → สร้าง Snippet พร้อม
 | 1 | Setup โปรเจกต์, Docker Compose, schema + migration, **PoC การค้นหาภาษาไทย** |
 | 2 | Auth, invite, หน้า Admin › ผู้ใช้, permission engine + test matrix เบื้องต้น |
 | 3 | Collection tree, CRUD รายการ (Note, Link), สิทธิ์ + การสืบทอด |
-| 4 | Snippet / Script (CodeMirror, Shiki, หลาย code block), tag |
-| 5 | ไฟล์แนบ (upload/download), ประวัติเวอร์ชัน, optimistic locking |
+| 4 | Editor Markdown (CodeMirror) + code fence ด้วย Shiki/Copy, ป้าย kinds (D22), tag |
+| 5 | ไฟล์แนบใต้ Note (upload/download), ประวัติเวอร์ชัน, optimistic locking |
 | 6 | การค้นหาเต็มรูปแบบ, Ctrl+K, highlight, facet |
 | 7 | ถังขยะ, audit log, Admin › รายการส่วนตัว / audit log, backup |
 | 8 | ทดสอบตาม DoD, แก้บั๊ก, เขียนเอกสาร, deploy จริง |

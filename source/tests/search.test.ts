@@ -21,8 +21,7 @@ describe("expandIdentifiers", () => {
 describe("buildSearchText", () => {
   const text = buildSearchText({
     title: "วิธีติดตั้งระบบ",
-    body: "# หัวข้อ\nดู [คู่มือ](http://x)",
-    codeBlocks: [{ filename: "docker-compose.yml", content: "function getUserById() {}" }],
+    body: "# หัวข้อ\nดู [คู่มือ](http://x)\n\n**docker-compose.yml**\n\n```js\nfunction getUserById() {}\n```",
     tagNames: ["Docker"],
   });
   it("ค้นไทยแบบไม่มีช่องว่างได้", () => expect(text).toContain("ติดตั้ง"));
@@ -34,8 +33,8 @@ describe("buildSearchText", () => {
     expect(text).not.toContain("](");
     expect(text).toContain("คู่มือ");
   });
-  it("จำกัดขนาด code 200 KB", () => {
-    const big = buildSearchText({ title: "t", codeBlocks: [{ content: "a".repeat(500_000) }] });
+  it("จำกัดขนาดเนื้อหา 200 KB", () => {
+    const big = buildSearchText({ title: "t", body: "a".repeat(500_000) });
     expect(big.length).toBeLessThan(210_000);
   });
 });

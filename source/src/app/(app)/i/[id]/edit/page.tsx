@@ -9,6 +9,9 @@ export default async function EditPage({ params }: { params: Promise<{ id: strin
   const it = await orNotFound(getItemDetail(ctx, id));
   if (!it.canEdit) await orNotFound(Promise.reject(new AppError(403, "forbidden")));
   return (
-    <ItemEditor targets={[]} initial={{ id, version: it.version, type: it.type === "link" ? "link" : "note", title: it.title, summary: it.summary ?? "", body: it.body ?? "", url: it.url ?? "", collectionId: it.collectionId ?? "" }} />
+    <ItemEditor targets={[]} initial={{
+      id, version: it.version, title: it.title, summary: it.summary ?? "", body: it.body ?? "",
+      collectionId: it.collectionId ?? "", kinds: it.kinds, tags: it.tags.map((t) => t.name),
+    }} />
   );
 }
