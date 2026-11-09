@@ -3,10 +3,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, PermissionDialog } from "@/components/PermissionDialog";
+import { CollectionPicker, type PickTarget } from "@/components/CollectionPicker";
 import { Alert, Button, Dialog } from "@/components/ui";
 import type { Effective, Setting } from "@/lib/permissions";
 
-type Target = { id: string; name: string; depth: number };
+type Target = PickTarget;
 
 export function ItemActions({ id, canEdit, canManage, visibility, effective, hasCollection, collectionId, targets }: {
   id: string; canEdit: boolean; canManage: boolean; visibility: Setting; effective: Effective; hasCollection: boolean; collectionId: string | null; targets: Target[];
@@ -42,11 +43,9 @@ export function ItemActions({ id, canEdit, canManage, visibility, effective, has
           <div className="space-y-4">
             {err && <Alert>{err}</Alert>}
             <div className="space-y-1.5">
-              <label htmlFor="dest" className="text-[13px] font-semibold text-muted">ปลายทาง</label>
-              <select id="dest" value={dest} onChange={(e) => setDest(e.target.value)} className="min-h-11 w-full rounded-[10px] border border-line bg-code px-3">
-                <option value="">Inbox (ไม่อยู่ใน Collection)</option>
-                {targets.map((t) => <option key={t.id} value={t.id}>{"— ".repeat(t.depth - 1)}{t.name}</option>)}
-              </select>
+              <p className="text-[13px] font-semibold text-muted">ปลายทาง</p>
+              <CollectionPicker targets={targets} value={dest} onChange={setDest} currentId={collectionId} />
+              <p className="text-xs text-muted">คลิกเพื่อเลือก หรือพิมพ์ชื่อ Collection เพื่อค้นหา · ↑ ↓ เลื่อน · Enter เลือก</p>
             </div>
             <Alert tone="warn">ถ้ารายการตั้งสิทธิ์ “ตาม Collection” สิทธิ์จะเปลี่ยนตามปลายทาง (Inbox ใช้ค่าเริ่มต้นของทีม) ตรวจสอบก่อนย้าย</Alert>
             <div className="flex justify-end gap-2">

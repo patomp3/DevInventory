@@ -34,13 +34,19 @@ export function Alert({ tone = "error", children }: { tone?: "error" | "info" | 
 
 export function Dialog({ title, onClose, children, width = 560 }: { title: string; onClose: () => void; children: ReactNode; width?: number }) {
   const ref = useRef<HTMLDivElement>(null);
+  // เก็บ onClose ล่าสุดไว้ใน ref: ผู้เรียกส่งฟังก์ชันใหม่ทุกครั้งที่ render ถ้าใส่ใน deps ของ effect
+  // จะ focus ซ้ำทุกครั้งที่พิมพ์ (โฟกัสเด้งไปที่ปุ่ม ✕) — ต้อง focus เฉพาะตอนเปิด dialog ครั้งเดียว
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    ref.current?.querySelector<HTMLElement>("input,button,select")?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    // ช่องกรอก/select ก่อน (ไม่ใช่ปุ่ม ✕ ที่อยู่แรกสุดใน DOM); ไม่มีช่องกรอกจึงค่อยเป็นปุ่ม
+    const root = ref.current;
+    (root?.querySelector<HTMLElement>("input:not([type=hidden]),textarea,select") ?? root?.querySelector<HTMLElement>("button:not([aria-label=ปิด])") ?? root?.querySelector<HTMLElement>("button"))?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("keydown", onKey); prev?.focus(); };
-  }, [onClose]);
+  }, []);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div ref={ref} role="dialog" aria-modal="true" aria-label={title} style={{ maxWidth: width }}

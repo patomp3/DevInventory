@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { collections, items, workspaces } from "@/lib/db/schema";
 import { AppError, notFound } from "@/lib/errors";
 import { isUuid } from "@/lib/uuid";
+import { orderCollections } from "@/lib/collection-order";
 import { canEdit, canManage, canView, resolveEffective, visibleItemsWhere, type Ctx, type Effective, type Setting } from "@/lib/permissions";
 
 export type Tx = Parameters<Parameters<ReturnType<typeof db>["transaction"]>[0]>[0];
@@ -179,7 +180,7 @@ export async function listWritableCollections(ctx: Ctx) {
   const tree = await listTree(ctx);
   const rows = tree.length ? await db().select().from(collections).where(inArray(collections.id, tree.map((t) => t.id))) : [];
   const ok = new Set(rows.filter((c) => canEdit(ctx, c)).map((c) => c.id));
-  return tree.filter((t) => ok.has(t.id));
+  return orderCollections(tree.filter((t) => ok.has(t.id)));
 }
 
 

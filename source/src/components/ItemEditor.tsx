@@ -14,7 +14,7 @@ import { VIS_LABEL } from "@/lib/visibility-labels";
 export type EditorInitial = {
   id?: string; version?: number; title: string; summary: string; body: string; collectionId: string; kinds: Kind[]; tags: string[];
 };
-type Target = { id: string; name: string; depth: number };
+type Target = { id: string; name: string; level: number; path: string };
 
 const BODY_PLACEHOLDER = [
   "เขียนเนื้อหาเป็น Markdown ได้ทั้งหมด เช่น",
@@ -160,7 +160,7 @@ export function ItemEditor({ initial, targets, attachments = [] }: { initial: Ed
                 <label htmlFor="col" className={label}>Collection</label>
                 <select id="col" value={f.collectionId} onChange={set("collectionId")} className={select}>
                   <option value="">Inbox</option>
-                  {targets.map((t) => <option key={t.id} value={t.id}>{"— ".repeat(t.depth - 1)}{t.name}</option>)}
+                  {targets.map((t) => <option key={t.id} value={t.id}>{"— ".repeat(t.level)}{t.name}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">

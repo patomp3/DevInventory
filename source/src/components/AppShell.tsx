@@ -10,11 +10,12 @@ type U = { id: string; displayName: string; email: string; role: "admin" | "memb
 
 export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; children: React.ReactNode }) {
   const path = usePathname();
-  const item = (href: string, label: string) => {
+  const item = (href: string, label: string, sub = false) => {
     const active = href === "/" ? path === "/" : path.startsWith(href);
     return (
       <Link href={href} aria-current={active ? "page" : undefined}
-        className={`flex min-h-10 items-center rounded-lg px-3 text-sm ${active ? "bg-accent-soft text-accent" : "text-text-2 hover:bg-surface-hover"}`}>
+        className={`flex min-h-10 cursor-pointer items-center rounded-lg px-3 text-sm ${active ? "bg-accent-soft text-accent" : "text-text-2 hover:bg-surface-hover"}`}>
+        {sub && <span aria-hidden className="mr-2 text-muted">›</span>}
         {label}
       </Link>
     );
@@ -32,25 +33,31 @@ export function AppShell({ user, tree, children }: { user: U; tree: TreeNode[]; 
         </div>
         <nav className="space-y-0.5" aria-label="เมนูหลัก">
           {item("/", "หน้าแรก")}
-          {item("/inbox", "Inbox")}
           {item("/mine", "ของฉัน")}
-          {item("/search", "ค้นหา")}
-          {item("/trash", "ถังขยะ")}
-          {user.role === "admin" && (
-            <>
-              <p className="px-3 pb-1 pt-4 text-[13px] font-semibold text-muted">ผู้ดูแลระบบ</p>
-              {item("/admin/users", "ผู้ใช้")}
-              {item("/admin/private-items", "รายการส่วนตัว")}
-              {item("/admin/audit", "Audit log")}
-              {item("/admin/settings", "ตั้งค่า")}
-            </>
-          )}
+          {item("/inbox", "Inbox")}
         </nav>
-        <div className="mb-1 mt-5 flex items-center justify-between px-3">
+        <div className="mb-1 mt-4 flex items-center justify-between px-3">
           <p className="text-[13px] font-semibold text-muted">Collections</p>
           <NewCollectionButton />
         </div>
         <CollectionTree nodes={tree} />
+        <nav className="mt-4 space-y-0.5 border-t border-[var(--border-nav)] pt-3" aria-label="เมนูอื่น ๆ">
+          {item("/search", "ค้นหา")}
+          {item("/trash", "ถังขยะ")}
+          {user.role === "admin" && (
+            <div className="mt-4 border-t border-[var(--border-nav)] pt-3">
+              <p className="cursor-default select-none px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-faint">
+                ผู้ดูแลระบบ
+              </p>
+              <div className="ml-3 space-y-0.5 border-l border-[var(--border-strong)] pl-1">
+                {item("/admin/users", "ผู้ใช้", true)}
+                {item("/admin/private-items", "รายการส่วนตัว", true)}
+                {item("/admin/audit", "Audit log", true)}
+                {item("/admin/settings", "ตั้งค่า", true)}
+              </div>
+            </div>
+          )}
+        </nav>
       </aside>
       <div className="min-w-0 flex-[999_1_560px]">
         <header className="flex items-center justify-end gap-3 border-b border-[var(--border-nav)] px-8 py-3">

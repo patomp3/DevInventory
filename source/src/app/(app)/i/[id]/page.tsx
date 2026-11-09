@@ -33,7 +33,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
           <p className="mt-1 text-xs text-muted">โดย {item.ownerName} · แก้ไขล่าสุด {item.updatedAt.toLocaleString("th-TH")} · v{item.version}</p>
         </div>
         <ItemActions id={id} canEdit={item.canEdit} canManage={item.canManage} visibility={item.visibility} effective={item.effectiveVisibility}
-          hasCollection={!!item.collectionId} collectionId={item.collectionId} targets={targets.map((t) => ({ id: t.id, name: t.name, depth: t.depth }))} />
+          hasCollection={!!item.collectionId} collectionId={item.collectionId} targets={targets.map((t) => ({ id: t.id, name: t.name, level: t.level, path: t.path }))} />
       </div>
       {item.summary && <p className="mt-4 text-text-2">{item.summary}</p>}
       {item.tags.length > 0 && <div className="mt-3"><TagChips tags={item.tags} /></div>}

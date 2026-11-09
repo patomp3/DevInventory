@@ -11,7 +11,7 @@ export default async function NewPage({ searchParams }: { searchParams: Promise<
   const c = targets.some((t) => t.id === sp.c) ? sp.c! : "";
   const kind = sp.kind && isKind(sp.kind) ? sp.kind : "note";
   return (
-    <ItemEditor targets={targets.map((t) => ({ id: t.id, name: t.name, depth: t.depth }))}
+    <ItemEditor targets={targets.map((t) => ({ id: t.id, name: t.name, level: t.level, path: t.path }))}
       initial={{ title: "", summary: "", body: "", collectionId: c, kinds: [kind], tags: [] }} />
   );
 }
