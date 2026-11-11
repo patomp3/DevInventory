@@ -16,6 +16,8 @@ services:
     environment:
       # แอปใช้ role สิทธิ์ต่ำ (APP_DATABASE_URL) ถ้าตั้งไว้ — ไม่งั้นใช้ DATABASE_URL เดิม (ดู docs/runbook.md §0)
       DATABASE_URL: ${APP_DATABASE_URL:-${DATABASE_URL}}
+      # บังคับให้ตรงกับ volume "files" เสมอ — กันค่า FILES_DIR ของ dev ใน .env (./data/files) ทำให้ไฟล์แนบไปอยู่ใน container แล้วหายตอน build ใหม่
+      FILES_DIR: /data/files
     volumes:
       - files:/data/files
     depends_on:
@@ -61,6 +63,8 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: ${APP_DATABASE_URL:-${DATABASE_URL}}
+      # บังคับให้ตรงกับ volume "files" เสมอ — กันค่า FILES_DIR ของ dev ใน .env (./data/files) ทำให้ไฟล์แนบไปอยู่ใน container แล้วหายตอน build ใหม่
+      FILES_DIR: /data/files
     volumes:
       - files:/data/files
     depends_on:
