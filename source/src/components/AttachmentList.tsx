@@ -1,15 +1,18 @@
+"use client";
+import { useT } from "@/components/LocaleProvider";
 import { formatBytes, isInlineMime } from "@/lib/attachment-meta";
 
 type A = { id: string; name: string; mime: string; size: number; uploadedByName: string };
 
 /** ไฟล์แนบในหน้า Detail: รูปแสดงตัวอย่าง (inline), ไฟล์อื่นเป็นลิงก์ดาวน์โหลด — ทุกลิงก์ผ่าน API ที่ตรวจสิทธิ์ทุกครั้ง */
 export function AttachmentList({ items }: { items: A[] }) {
+  const t = useT();
   if (!items.length) return null;
   const url = (id: string) => `/api/v1/attachments/${id}/download`;
   const images = items.filter((a) => isInlineMime(a.mime));
   return (
     <section aria-labelledby="att-h" className="mt-6">
-      <h2 id="att-h" className="mb-2 text-[13px] font-semibold text-muted">ไฟล์แนบ <span className="font-mono font-normal">({items.length})</span></h2>
+      <h2 id="att-h" className="mb-2 text-[13px] font-semibold text-muted">{t("att.title")} <span className="font-mono font-normal">({items.length})</span></h2>
       {images.length > 0 && (
         <ul className="mb-3 flex flex-wrap gap-3">
           {images.map((a) => (

@@ -28,7 +28,7 @@ Next.js 15 App Router (TypeScript, webpack) · Drizzle ORM + `pg` · PostgreSQL 
 | 7 | ถังขยะ, Admin › รายการส่วนตัว/audit log/ตั้งค่า/โอนเจ้าของ, backup + runbook | เสร็จ (e2e 264/264, ข้าม workspace 22/22, restore-test จริง) — **restic/compose บนเซิร์ฟเวอร์จริงยังไม่เคยรัน** |
 | 8 | ทดสอบตาม DoD, แก้บั๊ก, เอกสาร, deploy | ทำแล้ว: permission matrix, hardening (CSP/role DB/uuid), e2e-auth, CI · docker compose + Caddy/HTTPS ตรวจจริงแล้ว (stack ชั่วคราว) · **เหลือ:** backup restic รอบแรก, Playwright, deploy เซิร์ฟเวอร์จริง |
 
-เลื่อนไปเฟส 2 (อย่าทำตอนนี้): Google login, share รายบุคคล/กลุ่ม, access requests, pin, notifications, หน้า "บัญชีของฉัน", mobile, light mode
+เลื่อนไปเฟส 2 (อย่าทำตอนนี้): Google login, share รายบุคคล/กลุ่ม, access requests, pin, notifications, หน้า "บัญชีของฉัน", mobile (light mode ทำแล้วตามคำขอ — ดูหัวข้อ "ธีมสี")
 
 ## โครงสร้าง `source/`
 
@@ -45,6 +45,7 @@ src/lib/search/query.ts  searchItems (ผล+total+facet+คำแนะนำ) 
 src/lib/trash.ts      ถังขยะ: listTrash / restoreItem / purgeItem / purgeExpired (งานรายคืน 30 วัน) · src/lib/admin-items.ts รายการส่วนตัว (metadata) + transferItem · src/lib/admin-audit.ts + audit-format.ts (กรอง/CSV) · src/lib/workspace-settings.ts
 src/lib/highlight.ts   Shiki highlighter ตัวเดียว (JS regex engine, ธีมเองตาม ui-design §3.1) ใช้ผ่าน @shikijs/rehype ใน MarkdownView
 src/middleware.ts      CSP แบบ nonce (ข้าม /api) · src/lib/uuid.ts isUuid (id ที่ไม่ใช่ UUID = 404)
+src/lib/i18n/          สองภาษา th/en: locales.ts (pure), messages.ts (พจนานุกรม + translate), server.ts (getLocale/getT) · src/components/LocaleProvider (useT) + LanguageSwitcher
 src/lib/auth/          Better Auth config (lazy), session helper, password policy
 src/lib/api.ts         userRoute()/requireAdmin() — ตรวจ Origin(CSRF) + session + แปลง AppError → HTTP
 src/lib/audit.ts       เขียน audit_logs   ·  src/lib/errors.ts  AppError, notFound
@@ -97,7 +98,7 @@ npm run dev                      # http://localhost:3000
 
 ## ทดสอบ
 
-- `npm test` (Vitest, 127 เคส: permission matrix (รวมถังขยะ), uuid, collection-order, audit-format (CSV), search (normalize/parseQuery/query), snippet (ไฮไลต์), password policy, item-content, attachment-meta, item-history) · `npm run typecheck` · `npm run build`
+- `npm test` (Vitest, 135 เคส: i18n, theme, permission matrix (รวมถังขยะ), uuid, collection-order, audit-format (CSV), search (normalize/parseQuery/query), snippet (ไฮไลต์), password policy, item-content, attachment-meta, item-history) · `npm run typecheck` · `npm run build`
 - e2e (ต้องมีเซิร์ฟเวอร์รันอยู่ + DB ที่ seed แล้ว + `psql`; เขียนเป็น bash — บน Windows ใช้ Git Bash/WSL): `scripts/e2e-auth.sh` (login lockout, เชิญ, รีเซ็ตรหัส, ปิดบัญชี) และ `scripts/e2e-items.sh` (สิทธิ์/สืบทอด/409/ความลึก + ป้าย/tag/Markdown) ตั้งตัวแปร env `B`, `PSQL`, `ADMIN_EMAIL`, `ADMIN_PW`, `MEMBER_EMAIL`, `PY` ให้ตรงกับเครื่อง — บนเครื่องนี้: `PY=python` (python3 เป็นแค่ stub ของ Store), `PSQL="docker exec -i source-db-1 psql -U inventory inventory"`, `B=http://localhost:3100`
 - **สร้าง workspace ทดสอบ + ตัวแปร:** `npx tsx --env-file=.env scripts/e2e-workspace.ts /tmp/e2e.env` แล้ว `set -a; . /tmp/e2e.env; set +a` (ได้ `ADMIN_EMAIL`/`ADMIN_PW`/`MEMBER_EMAIL`/`INVITE_EMAIL`) · `npm run e2e:matrix` สร้างข้อมูลของตัวเอง (ต้องมีเซิร์ฟเวอร์ที่ B=http://localhost:3100) · CI รันทั้งสามชุดใน `.github/workflows/ci.yml`
 - e2e-items.sh นับจำนวนแบบ workspace ว่าง จึงควรรันกับ workspace ใหม่ที่มี admin คนเดียว และ `MEMBER_EMAIL` ที่ไม่เคยใช้ (ผลล่าสุด 2026-11-06 สัปดาห์ 8: items 267/267, auth 90/90; + `npm run e2e:matrix` 690/690) · ข้อความไทยใน curl ต้องเขียนเป็น `\uXXXX`/`%XX` เพราะ Git Bash ทำ argv ภาษาไทยเพี้ยน · `curl -F file=@…` บน Windows อ่าน path แบบ `/tmp/…` ไม่ได้ ต้องใช้ `cygpath -m` (สคริปต์ทำให้แล้ว)
@@ -162,6 +163,20 @@ npm run dev                      # http://localhost:3000
 - **e2e-auth.sh** เขียนใหม่ให้ตัดสินผ่าน/ไม่ผ่าน: throttle, CSRF, เส้นทาง Better Auth ที่ปิด, คำเชิญ (token เป็น hash), รีเซ็ต/ปิดบัญชี, header ความปลอดภัย, สิทธิ์ role DB, ไม่มีรหัสผ่านใน audit
 - **docker compose + Caddy ตรวจจริงแล้ว** (stack ชั่วคราว ลบทิ้งแล้ว): migrate 0000–0004, role `inventory_app`, HTTPS/HSTS/CSP nonce/cookie Secure, matrix 690/690 ผ่าน Caddy, อัปโหลด 40 MB ได้/51 MB = 413, purge ทำงาน · Caddy เขียนทับ `X-Forwarded-For` จึงข้าม login throttle ไม่ได้ **แต่ต้องไม่เปิดพอร์ตของ service `app` ออกนอก compose**
 - **ยังไม่มี**: Playwright (ต้องดาวน์โหลดเบราว์เซอร์ — flow §16.3 ครอบคลุมด้วย HTTP ใน e2e-matrix + ตรวจในเบราว์เซอร์ด้วยมือ), การรัน restic จริง, Renovate (ใช้ Dependabot)
+
+## สองภาษา (ไทย/อังกฤษ) — ข้อควรรู้
+
+- เมนูเปลี่ยนภาษา = ปุ่มธงชาติ (SVG: ไทย/สหราชอาณาจักร) ใต้ปุ่ม "ออกจากระบบ" และมุมขวาบนของหน้า login/คำเชิญ/เปลี่ยนรหัสผ่าน (`LanguageSwitcher`) → `PUT /api/v1/me/locale` `{locale}` ตั้ง cookie `di-locale` เสมอ และถ้า login อยู่จะบันทึกที่ `users.locale` (migration `0005`, ค่าเริ่มต้น `th`) ของ **ตัวเอง** เท่านั้น (ไม่รับ user id จาก client) · ผู้ที่ login ใช้ค่าจากบัญชี, ผู้ที่ยังไม่ login ใช้ cookie, ไม่มี = ไทย (`getLocale()`) · root layout ตั้ง `<html lang>` และ `LocaleProvider`
+- ข้อความ UI ทั้งหมดอยู่ใน `src/lib/i18n/messages.ts` (th เป็นต้นแบบ key, en ต้องครบทุก key — typecheck + `tests/i18n.test.ts` ตรวจ รวมถึงว่า **en ต้องไม่มีตัวอักษรไทย**) · server component ใช้ `const { t, locale } = await getT()`, client component ใช้ `const t = useT()` / `useLocale()`, โค้ด client ที่ไม่ใช่ hook (เช่น `api()`, `uploadFile()`) ใช้ `tNow()` ที่อ่านภาษาจาก `<html lang>` · วันที่/ตัวเลขใช้ `DATE_LOCALE[locale]` ไม่ hardcode `th-TH`
+- ป้ายสิทธิ์/ป้ายชนิด/รหัส error เป็น **key** (`VIS_LABEL`, `VIS_HELP`, `KIND_HINT`, `err.<code>` ผ่าน `apiError(code)` ใน PermissionDialog.tsx) — แปลที่จุดแสดงผลด้วย `t(...)` · ชื่อ action ของ audit log และหัว CSV แปลใน `src/lib/audit-format.ts` (รับ `locale`, ค่าเริ่มต้น th) · CSV export ใช้ภาษาของ Admin ที่กด
+- แปลครบทุกหน้าแล้ว (ตรวจด้วยการเดิน 22 หน้าในโหมด en บน DB ชั่วคราว: ไม่มีตัวอักษรไทยใน HTML) **ข้อยกเว้น:** (1) เนื้อหาที่ผู้ใช้เขียนเอง/ชื่อ Collection/ชื่อรายการ, (2) การแสดง History ของ snapshot ก่อน D22 ที่แปลงเป็น Markdown ภาษาไทย (`item-history.ts` หัวข้อ "วิธีรัน/วิธีใช้"), (3) ข้อความ log ฝั่งเซิร์ฟเวอร์/คอมเมนต์ · ภาษาไทยอาจมีคำอังกฤษปนได้ (Collection, Inbox, Audit log ฯลฯ) แต่ภาษาอังกฤษต้องไม่มีไทย
+- **ข้อความ UI ใหม่ต้องเพิ่มทั้ง th และ en** (ไม่ hardcode ไทยใน JSX)
+
+## ธีมสี (dark/light) — ข้อควรรู้
+
+- ปุ่มธีม (พระจันทร์/ดวงอาทิตย์, `ThemeSwitcher`) อยู่ข้างธงภาษา → `PUT /api/v1/me/theme` `{theme}` ตั้ง cookie `di-theme` และบันทึก `users.theme` (migration `0006`, ค่าเริ่มต้น `dark`) ของตัวเอง · root layout ตั้ง `<html data-theme>` จากบัญชี/cookie (ไม่มี = dark) จึงไม่กะพริบ · ปุ่มเปลี่ยน `data-theme` ทันทีแล้วค่อยบันทึก
+- **สีทั้งหมดต้องมาจาก token ใน `globals.css`** (`:root` = dark, `:root[data-theme="light"]` = light): โครงหน้า/ข้อความ/เส้น/accent + สีโค้ด `--syn-*` (Shiki ใน `highlight.ts` และ CodeMirror ใน `CodeEditor.tsx` ใช้ `var(--syn-*)` ไม่ใช้ hex) — **ห้าม hardcode สี hex ใน component** · สี Tailwind ที่ใช้เป็นตัวอักษร (red-200/300, emerald-200/300) ถูก override ใน light ให้เข้มขึ้น ถ้าเพิ่มสีพาเลตต์ใหม่ต้องเพิ่ม override ด้วย
+- light เป็นชุดสีที่ผมกำหนดเอง (accent เป็นเหลืองน้ำตาลเข้ม `#a16207` เพื่อให้ตัวอักษรอ่านได้บนพื้นขาว) **ui-design §3 ยังระบุแค่ dark — ยังไม่ได้แก้เอกสารออกแบบ**
 
 ## ช่องว่างที่รู้อยู่แล้ว (ทำตอนถึงสัปดาห์ที่เกี่ยวข้อง)
 

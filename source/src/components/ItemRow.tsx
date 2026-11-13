@@ -1,10 +1,14 @@
+"use client";
 import Link from "next/link";
+import { useLocale } from "@/components/LocaleProvider";
+import { DATE_LOCALE } from "@/lib/i18n/locales";
 import { KindChips } from "@/components/KindChips";
 import { TagChips } from "@/components/TagChips";
 import { VisibilityBadge } from "@/components/VisibilityBadge";
 import type { ItemSummary } from "@/lib/items";
 
 export function ItemRow({ item }: { item: ItemSummary }) {
+  const locale = useLocale();
   return (
     <li>
       <Link href={`/i/${item.id}`} className="flex min-h-14 items-center gap-3 rounded-lg border-b border-[var(--border-row)] px-3 py-2.5 hover:bg-surface-hover">
@@ -17,7 +21,7 @@ export function ItemRow({ item }: { item: ItemSummary }) {
         <VisibilityBadge value={item.effectiveVisibility} />
         <div className="hidden w-40 text-right text-xs text-muted sm:block">
           <div>{item.ownerName}</div>
-          <div>{item.updatedAt.toLocaleDateString("th-TH")}</div>
+          <div>{item.updatedAt.toLocaleDateString(DATE_LOCALE[locale])}</div>
         </div>
       </Link>
     </li>

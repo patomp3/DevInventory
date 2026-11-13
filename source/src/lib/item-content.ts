@@ -1,16 +1,12 @@
 // ส่วนที่เป็น pure function ของเนื้อหารายการ (ใช้ได้ทั้ง server, client และ unit test — ห้าม import db)
 // D22: รายการทุกชิ้นเป็น Note ชนิดเดียว เนื้อหาทั้งหมดเป็น Markdown และติด "ป้าย" (kinds) ได้หลายป้าย
 import { AppError } from "@/lib/errors";
+import type { MsgKey } from "@/lib/i18n/messages";
 
 export const KINDS = ["note", "snippet", "script", "link"] as const;
 export type Kind = (typeof KINDS)[number];
 export const KIND_LABEL: Record<Kind, string> = { note: "Note", snippet: "Snippet", script: "Script", link: "Link" };
-export const KIND_HINT: Record<Kind, string> = {
-  note: "เอกสาร / บันทึก",
-  snippet: "มีโค้ดสั้น ๆ ให้คัดลอก",
-  script: "สคริปต์พร้อมวิธีรัน",
-  link: "ลิงก์อ้างอิง",
-};
+export const KIND_HINT: Record<Kind, MsgKey> = { note: "kind.note", snippet: "kind.snippet", script: "kind.script", link: "kind.link" };
 export const isKind = (v: string): v is Kind => (KINDS as readonly string[]).includes(v);
 
 // ---------- ข้อจำกัด ----------

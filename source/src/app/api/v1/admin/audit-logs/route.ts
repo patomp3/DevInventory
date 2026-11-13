@@ -3,11 +3,11 @@ import { exportAudit, queryAudit } from "@/lib/admin-audit";
 import { auditToCsv } from "@/lib/audit-format";
 
 /** GET /api/v1/admin/audit-logs?action=&user=&from=&to=&page= · &format=csv = ส่งออกทั้งหมดที่ตรงตัวกรอง (สูงสุด 50,000 แถว) */
-export const GET = adminRoute(async ({ req, ctx }) => {
+export const GET = adminRoute(async ({ req, ctx, user }) => {
   const sp = new URL(req.url).searchParams;
   const f = { action: sp.get("action") || undefined, userId: sp.get("user") || undefined, from: sp.get("from") || undefined, to: sp.get("to") || undefined };
   if (sp.get("format") === "csv") {
-    const csv = auditToCsv(await exportAudit(ctx, f));
+    const csv = auditToCsv(await exportAudit(ctx, f), user.locale);
     return new Response(csv, { headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="audit-log-${new Date().toISOString().slice(0, 10)}.csv"`,

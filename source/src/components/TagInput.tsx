@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
+import { useT } from "@/components/LocaleProvider";
 import { LIMITS, normalizeTag } from "@/lib/item-content";
 
 type Suggestion = { name: string; slug: string; count: number };
 
 /** ช่อง tag (ui-design §6 `TagInput`): chip (× ลบ) + autocomplete จาก /api/v1/tags (กรองตามสิทธิ์ฝั่ง server) */
 export function TagInput({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const tr = useT();
   const id = useId();
   const [text, setText] = useState("");
   const [sugs, setSugs] = useState<Suggestion[]>([]);
@@ -63,10 +65,10 @@ export function TagInput({ value, onChange }: { value: string[]; onChange: (v: s
           {value.map((t) => (
             <span key={t} className="inline-flex items-center gap-1 rounded-md bg-surface-hover py-0.5 pl-2 pr-1 text-xs text-text-2">
               {t}
-              <button type="button" aria-label={`ลบ tag ${t}`} onClick={() => onChange(value.filter((x) => x !== t))} className="rounded px-1 text-muted hover:text-text">×</button>
+              <button type="button" aria-label={tr("tags.remove", { t })} onClick={() => onChange(value.filter((x) => x !== t))} className="rounded px-1 text-muted hover:text-text">×</button>
             </span>
           ))}
-          <input id={id} value={text} disabled={full} placeholder={full ? `ครบ ${LIMITS.tags} tag แล้ว` : value.length ? "" : "พิมพ์แล้วกด Enter"}
+          <input id={id} value={text} disabled={full} placeholder={full ? tr("tags.full", { n: LIMITS.tags }) : value.length ? "" : tr("tags.placeholder")}
             onChange={(e) => { setText(e.target.value); setOpen(true); }} onKeyDown={onKey}
             onBlur={() => setTimeout(() => setOpen(false), 120)} onFocus={() => setOpen(true)}
             role="combobox" aria-expanded={open && shown.length > 0} aria-controls={`${id}-list`} aria-autocomplete="list"
@@ -85,7 +87,7 @@ export function TagInput({ value, onChange }: { value: string[]; onChange: (v: s
           </ul>
         )}
       </div>
-      <p className="text-xs text-muted">Enter หรือ , เพื่อเพิ่ม · ไม่เกิน {LIMITS.tags} tag</p>
+      <p className="text-xs text-muted">{tr("tags.hint", { n: LIMITS.tags })}</p>
     </div>
   );
 }

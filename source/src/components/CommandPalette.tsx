@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/components/LocaleProvider";
 import { Command } from "cmdk";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -31,6 +32,7 @@ const row = "flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3 text-sm
 
 /** ปุ่มค้นหาที่แถบบน + palette Ctrl/⌘+K (design §8.6, ui-design `CommandPalette`) */
 export function SearchButton({ userKey }: { userKey: string }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -78,22 +80,22 @@ export function SearchButton({ userKey }: { userKey: string }) {
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} aria-label="ค้นหา (Ctrl K)"
+      <button type="button" onClick={() => setOpen(true)} aria-label={t("palette.buttonLabel")}
         className="flex min-h-10 items-center gap-3 rounded-lg border border-line bg-code px-3 text-sm text-muted hover:bg-surface-hover">
-        <span>ค้นหา snippet, script, note…</span>
+        <span>{t("palette.button")}</span>
         <kbd className="rounded border border-[var(--border-strong)] px-1.5 font-mono text-[11px] text-text-2">Ctrl K</kbd>
       </button>
-      <Command.Dialog open={open} onOpenChange={setOpen} label="ค้นหา" shouldFilter={false} value={sel} onValueChange={setSel}
+      <Command.Dialog open={open} onOpenChange={setOpen} label={t("palette.label")} shouldFilter={false} value={sel} onValueChange={setSel}
         overlayClassName="fixed inset-0 z-50 bg-black/60"
         contentClassName="fixed left-1/2 top-[12vh] z-50 w-[min(640px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-[14px] border border-line bg-sidebar shadow-[0_24px_60px_rgba(0,0,0,.55)]"
         onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && q.trim()) { e.preventDefault(); full(); } }}>
-        <Command.Input value={q} onValueChange={setQ} placeholder="พิมพ์ชื่อเรื่องหรือ tag…" autoFocus
+        <Command.Input value={q} onValueChange={setQ} placeholder={t("palette.placeholder")} autoFocus
           className="w-full border-b border-line bg-transparent px-4 py-4 text-base text-text outline-none placeholder:text-faint" />
         <Command.List className="max-h-[52vh] overflow-y-auto p-2">
           {q.trim() ? (
             <>
               {hits.length > 0 && (
-                <Command.Group heading="รายการ" className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted">
+                <Command.Group heading={t("palette.items")} className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted">
                   {hits.map((h) => (
                     <Command.Item key={h.id} value={h.id} onSelect={() => go(`/i/${h.id}`)} className={row}>
                       <span className="flex gap-1">{h.kinds.map((k) => <span key={k} className="rounded-md border border-[var(--border-strong)] px-1.5 font-mono text-[11px] text-text-2">{KIND_LABEL[k].toLowerCase()}</span>)}</span>
@@ -103,19 +105,19 @@ export function SearchButton({ userKey }: { userKey: string }) {
                   ))}
                 </Command.Group>
               )}
-              {!loading && hits.length === 0 && <p className="px-3 py-4 text-sm text-muted">ไม่พบรายการที่ชื่อหรือ tag ตรงกัน</p>}
+              {!loading && hits.length === 0 && <p className="px-3 py-4 text-sm text-muted">{t("palette.noMatch")}</p>}
               <Command.Item value="__all__" onSelect={full} className={row}>
-                <span aria-hidden>🔎</span><span className="flex-1">ค้นหา “{q.trim()}” ในเนื้อหาทั้งหมด</span><kbd className="font-mono text-[11px] text-muted">Ctrl ↵</kbd>
+                <span aria-hidden>🔎</span><span className="flex-1">{t("palette.fullSearch", { q: q.trim() })}</span><kbd className="font-mono text-[11px] text-muted">Ctrl ↵</kbd>
               </Command.Item>
             </>
           ) : recent.length > 0 ? (
-            <Command.Group heading="เปิดล่าสุด" className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted">
+            <Command.Group heading={t("palette.recent")} className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:text-muted">
               {recent.map((r) => <Command.Item key={r.id} value={r.id} onSelect={() => go(`/i/${r.id}`)} className={row}><span className="truncate">{r.title}</span></Command.Item>)}
             </Command.Group>
-          ) : <p className="px-3 py-4 text-sm text-muted">พิมพ์เพื่อค้นหา — ใช้ tag:docker, kind:script, &quot;วลี&quot;, -คำ ได้ในหน้าผลค้นหา</p>}
+          ) : <p className="px-3 py-4 text-sm text-muted">{t("palette.hint")}</p>}
         </Command.List>
         <div className="flex gap-4 border-t border-line px-4 py-2 text-xs text-muted">
-          <span><kbd className="font-mono">↑↓</kbd> เลือก</span><span><kbd className="font-mono">Enter</kbd> เปิด</span><span><kbd className="font-mono">Ctrl Enter</kbd> ผลค้นหาเต็ม</span><span><kbd className="font-mono">Esc</kbd> ปิด</span>
+          <span><kbd className="font-mono">↑↓</kbd> {t("palette.select")}</span><span><kbd className="font-mono">Enter</kbd> {t("palette.open")}</span><span><kbd className="font-mono">Ctrl Enter</kbd> {t("palette.fullResults")}</span><span><kbd className="font-mono">Esc</kbd> {t("common.close")}</span>
         </div>
       </Command.Dialog>
     </>

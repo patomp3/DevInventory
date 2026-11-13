@@ -1,11 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useT } from "@/components/LocaleProvider";
 import type { TreeNode } from "@/lib/collections";
 import { VIS_ICON } from "@/lib/visibility-labels";
 
 export function CollectionTree({ nodes }: { nodes: TreeNode[] }) {
   const path = usePathname();
+  const t = useT();
   const render = (parent: string | null, level: number): React.ReactNode =>
     nodes.filter((n) => n.parentId === parent).map((n) => {
       const active = path === `/c/${n.id}`;
@@ -21,6 +23,6 @@ export function CollectionTree({ nodes }: { nodes: TreeNode[] }) {
         </li>
       );
     });
-  if (!nodes.length) return <p className="px-3 text-xs text-muted">ยังไม่มี Collection</p>;
+  if (!nodes.length) return <p className="px-3 text-xs text-muted">{t("nav.noCollections")}</p>;
   return <ul aria-label="Collections">{render(null, 0)}</ul>;
 }

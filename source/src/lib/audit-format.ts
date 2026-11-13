@@ -1,4 +1,5 @@
 // การแสดง/ส่งออก audit log — pure (ไม่ import db) ใช้ร่วมกับหน้า Admin และ export CSV
+import type { Locale } from "@/lib/i18n/locales";
 
 export type AuditRow = {
   id: number; createdAt: Date; actorName: string | null; actorEmail: string | null; action: string;
@@ -17,12 +18,23 @@ export const ACTION_LABEL: Record<string, string> = {
   "item.version_restored": "กู้เวอร์ชัน", "attachment.uploaded": "อัปโหลดไฟล์แนบ", "attachment.deleted": "ลบไฟล์แนบ", "attachment.purged": "ลบไฟล์แนบถาวร",
   "workspace.settings_changed": "เปลี่ยนการตั้งค่า Workspace",
 };
-export const actionLabel = (a: string) => ACTION_LABEL[a] ?? a;
+const ACTION_LABEL_EN: Record<string, string> = {
+  "auth.login": "Logged in", "auth.login_failed": "Login failed", "auth.logout": "Logged out",
+  "user.seeded": "First admin created", "user.invited": "Invited a user", "invite.created": "Invite created", "invite.accepted": "Invite accepted", "invite.revoked": "Invite revoked",
+  "user.disabled": "Account disabled", "user.enabled": "Account enabled", "user.role_changed": "Role changed", "user.password_reset": "Password reset", "user.password_changed": "Password changed",
+  "collection.created": "Collection created", "collection.renamed": "Collection renamed", "collection.moved": "Collection moved", "collection.deleted": "Collection deleted",
+  "collection.visibility_changed": "Collection visibility changed",
+  "item.created": "Item created", "item.updated": "Item edited", "item.moved": "Item moved", "item.visibility_changed": "Item visibility changed",
+  "item.owner_transferred": "Ownership transferred", "item.deleted": "Item deleted (trash)", "item.restored": "Restored from trash", "item.purged": "Permanently deleted",
+  "item.version_restored": "Version restored", "attachment.uploaded": "Attachment uploaded", "attachment.deleted": "Attachment deleted", "attachment.purged": "Attachment permanently deleted",
+  "workspace.settings_changed": "Workspace settings changed",
+};
+export const actionLabel = (a: string, locale: Locale = "th") => (locale === "en" ? ACTION_LABEL_EN : ACTION_LABEL)[a] ?? a;
 
 /** สรุป before/after เป็นข้อความสั้นอ่านง่าย (ไม่มีเนื้อหารายการอยู่ใน audit อยู่แล้ว แต่ตัดความยาวกันตารางล้น) */
-export function summarizeDetail(row: Pick<AuditRow, "before" | "after">, max = 160): string {
+export function summarizeDetail(row: Pick<AuditRow, "before" | "after">, max = 160, locale: Locale = "th"): string {
   const parts: string[] = [];
-  for (const [label, v] of [["ก่อน", row.before], ["หลัง", row.after]] as const) {
+  for (const [label, v] of [[locale === "en" ? "Before" : "ก่อน", row.before], [locale === "en" ? "After" : "หลัง", row.after]] as const) {
     if (v === null || v === undefined) continue;
     const t = typeof v === "string" ? v : JSON.stringify(v);
     if (t && t !== "{}") parts.push(`${label}: ${t}`);
@@ -41,12 +53,15 @@ export function csvCell(v: unknown): string {
   return `"${s.replace(/"/g, '""')}"`;
 }
 
-const HEADER = ["เวลา", "ผู้กระทำ", "อีเมลผู้กระทำ", "action", "ชนิดเป้าหมาย", "เป้าหมาย", "ก่อน", "หลัง", "IP"];
+const HEADER: Record<Locale, string[]> = {
+  th: ["เวลา", "ผู้กระทำ", "อีเมลผู้กระทำ", "action", "ชนิดเป้าหมาย", "เป้าหมาย", "ก่อน", "หลัง", "IP"],
+  en: ["Time", "Actor", "Actor email", "action", "Target type", "Target", "Before", "After", "IP"],
+};
 
 /** CSV (UTF-8 พร้อม BOM ให้ Excel อ่านภาษาไทยถูก) */
-export function auditToCsv(rows: AuditRow[]): string {
+export function auditToCsv(rows: AuditRow[], locale: Locale = "th"): string {
   const j = (v: unknown) => (v === null || v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v));
-  const lines = [HEADER.map(csvCell).join(",")];
+  const lines = [HEADER[locale].map(csvCell).join(",")];
   for (const r of rows) {
     lines.push([
       r.createdAt.toISOString(), r.actorName, r.actorEmail, r.action, r.targetType, r.targetId, j(r.before), j(r.after), r.ip,

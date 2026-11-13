@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AttachmentPanel, uploadFile, type AttachmentView } from "@/components/AttachmentPanel";
 import { CodeEditor } from "@/components/CodeEditor";
 import { ConflictDialog, type ConflictCurrent } from "@/components/ConflictDialog";
+import { useT } from "@/components/LocaleProvider";
 import { api } from "@/components/PermissionDialog";
 import { TagInput } from "@/components/TagInput";
 import { Alert, Button, Field } from "@/components/ui";
@@ -16,20 +17,10 @@ export type EditorInitial = {
 };
 type Target = { id: string; name: string; level: number; path: string };
 
-const BODY_PLACEHOLDER = [
-  "เขียนเนื้อหาเป็น Markdown ได้ทั้งหมด เช่น",
-  "",
-  "## วิธีรัน",
-  "```bash",
-  "./deploy.sh --env staging",
-  "```",
-  "",
-  "ลิงก์: https://example.com",
-].join("\n");
-
 /** Editor เดียวสำหรับทุกรายการ (D22): ชื่อ, คำอธิบาย, ป้าย (เลือกได้หลายป้าย), เนื้อหา Markdown, Collection/สิทธิ์/Tag */
 export function ItemEditor({ initial, targets, attachments = [] }: { initial: EditorInitial; targets: Target[]; attachments?: AttachmentView[] }) {
   const router = useRouter();
+  const t = useT();
   const editing = !!initial.id;
   const [f, setF] = useState({ title: initial.title, summary: initial.summary, body: initial.body, collectionId: initial.collectionId });
   const [kinds, setKinds] = useState<Kind[]>(initial.kinds.length ? initial.kinds : ["note"]);
@@ -70,7 +61,7 @@ export function ItemEditor({ initial, targets, attachments = [] }: { initial: Ed
         if (!u.ok) failed.push(u.error);
       }
       if (failed.length) {
-        alert(`สร้างรายการแล้ว แต่แนบไฟล์ไม่สำเร็จ ${failed.length} ไฟล์\n${failed.join("\n")}\n\nจะพาไปหน้าแก้ไขเพื่อแนบใหม่`);
+        alert(`${t("editor.uploadPartial", { n: failed.length })}\n${failed.join("\n")}\n\n${t("editor.willOpenEdit")}`);
         router.push(`/i/${id}/edit`); router.refresh();
         return;
       }
@@ -100,7 +91,7 @@ export function ItemEditor({ initial, targets, attachments = [] }: { initial: Ed
   }, [dirty]);
 
   function cancel() {
-    if (dirty && !confirm("ยังไม่ได้บันทึก ต้องการออกจากหน้านี้หรือไม่?")) return;
+    if (dirty && !confirm(t("editor.confirmLeave"))) return;
     setDirty(false);
     router.back();
   }
@@ -112,39 +103,39 @@ export function ItemEditor({ initial, targets, attachments = [] }: { initial: Ed
     <form onSubmit={(e) => { e.preventDefault(); save(); }}>
       {/* แถบบน (ui-design §7.5) */}
       <div className="mb-6 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={cancel} aria-label="กลับ" className="rounded-lg px-2 py-1 text-muted hover:bg-surface-hover">←</button>
-        <h1 className="text-xl font-semibold">{editing ? "แก้ไขรายการ" : "สร้างรายการใหม่"}</h1>
+        <button type="button" onClick={cancel} aria-label={t("common.back")} className="rounded-lg px-2 py-1 text-muted hover:bg-surface-hover">←</button>
+        <h1 className="text-xl font-semibold">{editing ? t("editor.editTitle") : t("editor.newTitle")}</h1>
         <span className="text-xs text-muted">
-          {editing && `เวอร์ชัน ${version}`}{editing && dirty && " · "}{dirty && <span className="text-accent">ยังไม่ได้บันทึก</span>}
+          {editing && t("editor.versionN", { v: version ?? 0 })}{editing && dirty && " · "}{dirty && <span className="text-accent">{t("editor.unsaved")}</span>}
         </span>
         <div className="ml-auto flex gap-2">
-          <Button type="button" variant="secondary" onClick={cancel}>ยกเลิก</Button>
-          <Button type="submit" disabled={!canSave}>บันทึก <kbd className="font-mono text-[11px] opacity-70">Ctrl S</kbd></Button>
+          <Button type="button" variant="secondary" onClick={cancel}>{t("common.cancel")}</Button>
+          <Button type="submit" disabled={!canSave}>{t("common.save")} <kbd className="font-mono text-[11px] opacity-70">Ctrl S</kbd></Button>
         </div>
       </div>
       {err && <div className="mb-4"><Alert>{err}</Alert></div>}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
-          <Field label="ชื่อเรื่อง" required maxLength={200} value={f.title} onChange={set("title")} />
-          <Field label="คำอธิบายสั้น" maxLength={500} value={f.summary} onChange={set("summary")} />
+          <Field label={t("common.title")} required maxLength={200} value={f.title} onChange={set("title")} />
+          <Field label={t("common.summary")} maxLength={500} value={f.summary} onChange={set("summary")} />
           <div className="space-y-1.5">
-            <p className={label}>เนื้อหา (Markdown)</p>
-            <CodeEditor label="เนื้อหา (Markdown)" language="markdown" value={f.body} onChange={(v) => { setF((x) => ({ ...x, body: v })); touch(); }}
-              minHeight={360} placeholder={BODY_PLACEHOLDER} />
-            <p className="text-xs text-muted">ใส่โค้ดด้วย ```ภาษา … ``` (เช่น ```bash) จะมี highlight และปุ่ม Copy ในหน้ารายละเอียด · ห้ามวางรหัสผ่าน, token หรือ credential</p>
+            <p className={label}>{t("editor.body")}</p>
+            <CodeEditor label={t("editor.body")} language="markdown" value={f.body} onChange={(v) => { setF((x) => ({ ...x, body: v })); touch(); }}
+              minHeight={360} placeholder={t("editor.placeholder")} />
+            <p className="text-xs text-muted">{t("editor.bodyHint")}</p>
           </div>
         </div>
 
         {/* คอลัมน์ขวา */}
         <aside className="space-y-5">
           <fieldset className="space-y-1.5">
-            <legend className={label}>ป้าย <span className="font-normal">(เลือกได้หลายป้าย)</span></legend>
+            <legend className={label}>{t("editor.labels")} <span className="font-normal">{t("editor.labelsHint")}</span></legend>
             <div className="grid grid-cols-2 gap-2">
               {KINDS.map((k) => {
                 const on = kinds.includes(k);
                 return (
-                  <label key={k} title={KIND_HINT[k]}
+                  <label key={k} title={t(KIND_HINT[k])}
                     className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm ${on ? "border-accent bg-accent-soft text-accent" : "border-line text-text-2 hover:bg-surface-hover"}`}>
                     <input type="checkbox" checked={on} onChange={() => toggleKind(k)} className="accent-[var(--accent)]" />
                     {KIND_LABEL[k]}
@@ -152,28 +143,28 @@ export function ItemEditor({ initial, targets, attachments = [] }: { initial: Ed
                 );
               })}
             </div>
-            {kinds.length === 0 && <p role="alert" className="text-xs text-red-300">เลือกอย่างน้อย 1 ป้าย</p>}
+            {kinds.length === 0 && <p role="alert" className="text-xs text-red-300">{t("editor.labelRequired")}</p>}
           </fieldset>
           {!editing && (
             <>
               <div className="space-y-1.5">
-                <label htmlFor="col" className={label}>Collection</label>
+                <label htmlFor="col" className={label}>{t("common.collectionLabel")}</label>
                 <select id="col" value={f.collectionId} onChange={set("collectionId")} className={select}>
-                  <option value="">Inbox</option>
+                  <option value="">{t("common.inbox")}</option>
                   {targets.map((t) => <option key={t.id} value={t.id}>{"— ".repeat(t.level)}{t.name}</option>)}
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="vis" className={label}>ระดับการเข้าถึง</label>
+                <label htmlFor="vis" className={label}>{t("vis.level")}</label>
                 <select id="vis" value={vis} onChange={(e) => { setVis(e.target.value as Setting); touch(); }} className={select}>
-                  <option value="inherit">ตาม Collection (Inbox = ค่าเริ่มต้นของทีม)</option>
-                  {(["private", "workspace_view", "workspace_edit"] as const).map((o) => <option key={o} value={o}>{VIS_LABEL[o]}</option>)}
+                  <option value="inherit">{t("vis.inheritInbox")}</option>
+                  {(["private", "workspace_view", "workspace_edit"] as const).map((o) => <option key={o} value={o}>{t(VIS_LABEL[o])}</option>)}
                 </select>
               </div>
             </>
           )}
           <TagInput value={tags} onChange={(v) => { setTags(v); touch(); }} />
-          {editing && <p className="text-xs text-muted">ย้าย Collection และเปลี่ยนสิทธิ์ได้จากหน้ารายละเอียด</p>}
+          {editing && <p className="text-xs text-muted">{t("editor.moveHint")}</p>}
           <AttachmentPanel itemId={initial.id ?? null} files={files} onFiles={setFiles} pending={pending} onPending={(p) => { setPending(p); touch(); }} />
         </aside>
       </div>

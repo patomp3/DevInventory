@@ -3,7 +3,8 @@
 import { createHighlighter, type Highlighter, type ThemeRegistration } from "shiki";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
 
-const C = { key: "#7cb7ff", str: "#a5d6a7", comment: "#7d8797", text: "#c3cad6", bright: "#e7eaf0", bg: "#0b0d10" };
+// ใช้ CSS variable (--syn-* ใน globals.css) เพื่อให้เปลี่ยนตามธีม light/dark ได้โดยไม่ต้อง render ใหม่
+const C = { key: "var(--syn-key)", str: "var(--syn-str)", comment: "var(--syn-comment)", text: "var(--syn-text)", bright: "var(--syn-bright)", bg: "var(--code-bg)" };
 
 export const THEME_NAME = "dev-inventory";
 
@@ -27,7 +28,7 @@ const theme: ThemeRegistration = {
     { scope: ["string", "string.quoted", "string.template", "punctuation.definition.string", "markup.inline.raw", "markup.fenced_code", "string.unquoted"], settings: { foreground: C.str } },
     { scope: ["entity.name.function", "support.function", "entity.name.type", "entity.name.class"], settings: { foreground: C.bright } },
     { scope: ["markup.inserted"], settings: { foreground: C.str } },
-    { scope: ["markup.deleted"], settings: { foreground: "#f28b82" } },
+    { scope: ["markup.deleted"], settings: { foreground: "var(--syn-del)" } },
     { scope: ["markup.bold"], settings: { fontStyle: "bold" } },
     { scope: ["markup.italic"], settings: { fontStyle: "italic" } },
   ],

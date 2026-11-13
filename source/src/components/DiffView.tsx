@@ -1,6 +1,9 @@
+"use client";
+import { useT } from "@/components/LocaleProvider";
 import type { DiffRow, FieldChange } from "@/lib/item-history";
+import type { MsgKey } from "@/lib/i18n/messages";
 
-const FIELD_LABEL: Record<FieldChange["field"], string> = { title: "ชื่อเรื่อง", summary: "คำอธิบายสั้น", kinds: "ป้าย", tags: "Tag" };
+const FIELD_LABEL: Record<FieldChange["field"], MsgKey> = { title: "diff.title", summary: "diff.summary", kinds: "diff.kinds", tags: "diff.tags" };
 const CELL: Record<string, string> = {
   same: "text-text-2",
   removed: "bg-red-500/10 text-red-200",
@@ -9,12 +12,13 @@ const CELL: Record<string, string> = {
 
 /** การเปลี่ยนแปลงของฟิลด์สั้น (ชื่อ, คำอธิบาย, ป้าย, tag) */
 export function FieldChanges({ changes }: { changes: FieldChange[] }) {
+  const t = useT();
   if (!changes.length) return null;
   return (
     <ul className="space-y-1.5 rounded-xl border border-line bg-sidebar p-4 text-sm">
       {changes.map((c) => (
         <li key={c.field} className="flex flex-wrap items-baseline gap-2">
-          <span className="w-28 shrink-0 text-xs font-semibold text-muted">{FIELD_LABEL[c.field]}</span>
+          <span className="w-28 shrink-0 text-xs font-semibold text-muted">{t(FIELD_LABEL[c.field])}</span>
           <span className="rounded bg-red-500/10 px-1.5 text-red-200 line-through decoration-red-300/50">{c.before || "—"}</span>
           <span aria-hidden className="text-muted">→</span>
           <span className="rounded bg-emerald-500/10 px-1.5 text-emerald-200">{c.after || "—"}</span>
@@ -26,7 +30,8 @@ export function FieldChanges({ changes }: { changes: FieldChange[] }) {
 
 /** diff เนื้อหาแบบ side-by-side (ซ้าย = เวอร์ชันก่อนหน้า, ขวา = เวอร์ชันที่เลือก) บรรทัดยาวตัดขึ้นบรรทัดใหม่ */
 export function BodyDiff({ rows, leftLabel, rightLabel }: { rows: DiffRow[]; leftLabel: string; rightLabel: string }) {
-  if (!rows.length) return <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">เนื้อหาว่างทั้งสองเวอร์ชัน</p>;
+  const t = useT();
+  if (!rows.length) return <p className="rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">{t("diff.emptyBoth")}</p>;
   const changed = rows.some((r) => r.left?.kind !== "same" || r.right?.kind !== "same");
   const side = (c: DiffRow["left"], n: number) => (
     <div className={`flex min-w-0 ${c ? CELL[c.kind] : "bg-surface"}`}>
@@ -41,7 +46,7 @@ export function BodyDiff({ rows, leftLabel, rightLabel }: { rows: DiffRow[]; lef
         <div className="px-3 py-2">{leftLabel}</div>
         <div className="border-l border-line px-3 py-2">{rightLabel}</div>
       </div>
-      {!changed && <p className="border-b border-[var(--border-row)] px-3 py-2 text-xs text-muted">เนื้อหา (Markdown) ไม่เปลี่ยนในเวอร์ชันนี้</p>}
+      {!changed && <p className="border-b border-[var(--border-row)] px-3 py-2 text-xs text-muted">{t("diff.bodySame")}</p>}
       <div>
         {rows.map((row, i) => {
           if (row.left) l++;

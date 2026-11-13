@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useT } from "@/components/LocaleProvider";
 
 /** เลือกปลายทางแบบ dropdown ที่พิมพ์ค้นหาได้ (combobox): Inbox ก่อน แล้ว Collection → sub-collection (เยื้องตามชั้น) */
 export type PickTarget = { id: string; name: string; level: number; path: string };
@@ -11,6 +12,7 @@ const norm = (s: string) => s.normalize("NFC").toLowerCase().trim();
 export function CollectionPicker({ targets, value, onChange, currentId }: {
   targets: PickTarget[]; value: string; onChange: (id: string) => void; currentId: string | null;
 }) {
+  const t = useT();
   const uid = useId();
   const listId = `${uid}-list`;
   const boxRef = useRef<HTMLDivElement>(null);
@@ -52,22 +54,22 @@ export function CollectionPicker({ targets, value, onChange, currentId }: {
   return (
     <div ref={boxRef} className="relative">
       <input
-        role="combobox" aria-expanded={open} aria-controls={listId} aria-autocomplete="list" aria-label="ค้นหาปลายทาง"
+        role="combobox" aria-expanded={open} aria-controls={listId} aria-autocomplete="list" aria-label={t("picker.search")}
         aria-activedescendant={open && shown[active] ? `${uid}-o${active}` : undefined}
-        value={open ? q : selected.path} placeholder={open ? `พิมพ์เพื่อค้นหา (${all.length - 1} Collection)` : undefined}
+        value={open ? q : selected.path} placeholder={open ? t("picker.placeholder", { n: all.length - 1 }) : undefined}
         onFocus={(e) => { setOpen(true); e.currentTarget.select(); }}
         onClick={() => setOpen(true)}
         onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onKeyDown={onKey}
         className="min-h-11 w-full rounded-[10px] border border-line bg-code px-3 pr-9 text-sm"
       />
-      <button type="button" tabIndex={-1} aria-label={open ? "ปิดรายการ" : "เปิดรายการ"}
+      <button type="button" tabIndex={-1} aria-label={open ? t("picker.closeList") : t("picker.openList")}
         onMouseDown={(e) => e.preventDefault()} onClick={() => setOpen((v) => !v)}
         className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted">{open ? "▴" : "▾"}</button>
       {open && (
-        <ul ref={listRef} id={listId} role="listbox" aria-label="ปลายทาง"
+        <ul ref={listRef} id={listId} role="listbox" aria-label={t("move.destination")}
           className="absolute left-0 right-0 z-10 mt-1 max-h-64 overflow-y-auto rounded-[10px] border border-[var(--border-strong)] bg-sidebar p-1 shadow-[0_12px_32px_rgba(0,0,0,.5)]">
-          {shown.length === 0 && <li className="px-3 py-2 text-sm text-muted">ไม่พบ Collection ที่ตรงกับ “{q.trim()}”</li>}
+          {shown.length === 0 && <li className="px-3 py-2 text-sm text-muted">{t("picker.none", { q: q.trim() })}</li>}
           {shown.map((o, i) => {
             const isSel = o.id === value, isHere = (currentId ?? "") === o.id;
             return (
@@ -78,9 +80,9 @@ export function CollectionPicker({ targets, value, onChange, currentId }: {
                 {!filtering && o.level > 0 && <span aria-hidden className="text-muted">└</span>}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate">{filtering || o.level === 0 ? o.path : o.label}</span>
-                  {o.id === "" && <span className="block truncate text-xs text-muted">ไม่อยู่ใน Collection</span>}
+                  {o.id === "" && <span className="block truncate text-xs text-muted">{t("picker.inboxNote")}</span>}
                 </span>
-                {isHere && <span className="shrink-0 rounded bg-surface-hover px-1.5 py-0.5 text-[11px] text-muted">อยู่ที่นี่</span>}
+                {isHere && <span className="shrink-0 rounded bg-surface-hover px-1.5 py-0.5 text-[11px] text-muted">{t("picker.here")}</span>}
                 {isSel && <span aria-hidden className="shrink-0">✓</span>}
               </li>
             );

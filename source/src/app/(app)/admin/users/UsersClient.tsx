@@ -1,7 +1,10 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale, useT } from "@/components/LocaleProvider";
+import { apiError } from "@/components/PermissionDialog";
 import { Alert, Button, CopyBox, Dialog, Field } from "@/components/ui";
+import { DATE_LOCALE } from "@/lib/i18n/locales";
 
 type U = { id: string; email: string; displayName: string; role: "admin" | "member"; status: string; lastLoginAt: string | null };
 type Inv = { id: string; email: string; role: "admin" | "member"; expiresAt: string };
@@ -12,10 +15,6 @@ type Modal =
   | { k: "temp"; name: string; password: string };
 
 const roleLabel = (r: string) => (r === "admin" ? "Admin" : "Member");
-const errText: Record<string, string> = {
-  user_exists: "อีเมลนี้มีบัญชีอยู่แล้ว", invite_pending: "อีเมลนี้มีคำเชิญค้างอยู่ ให้ยกเลิกคำเชิญเดิมก่อน", invalid_email: "รูปแบบอีเมลไม่ถูกต้อง",
-  last_admin: "ต้องมี Admin ที่ใช้งานอยู่อย่างน้อย 1 คน", cannot_demote_self: "ปิดบัญชีหรือลดสิทธิ์ตัวเองไม่ได้",
-};
 
 async function call(url: string, method: string, body?: unknown) {
   const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
@@ -24,6 +23,8 @@ async function call(url: string, method: string, body?: unknown) {
 
 export function UsersClient({ meId, users, invites }: { meId: string; users: U[]; invites: Inv[] }) {
   const router = useRouter();
+  const t = useT();
+  const locale = useLocale();
   const [modal, setModal] = useState<Modal | null>(null);
   const [notice, setNotice] = useState("");
   const close = () => { setModal(null); router.refresh(); };
@@ -32,17 +33,17 @@ export function UsersClient({ meId, users, invites }: { meId: string; users: U[]
   const confirm = (m: Omit<Extract<Modal, { k: "confirm" }>, "k">) => setModal({ k: "confirm", ...m });
   const act = (fn: () => Promise<{ ok: boolean; data: { error?: string } }>) => async () => {
     const r = await fn();
-    return r.ok ? undefined : errText[r.data.error ?? ""] ?? "ดำเนินการไม่สำเร็จ";
+    return r.ok ? undefined : apiError(r.data.error);
   };
 
   return (
     <>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">ผู้ใช้</h1>
-          <p className="mt-1 text-sm text-muted">ใช้งาน {active} · ปิดบัญชี {users.length - active} · รอรับเชิญ {invites.length}</p>
+          <h1 className="text-2xl font-semibold">{t("admin.users.title")}</h1>
+          <p className="mt-1 text-sm text-muted">{t("admin.users.summary", { active, disabled: users.length - active, pending: invites.length })}</p>
         </div>
-        <Button onClick={() => setModal({ k: "invite" })}>เชิญด้วยอีเมล</Button>
+        <Button onClick={() => setModal({ k: "invite" })}>{t("admin.users.invite")}</Button>
       </div>
       {notice && <div className="mt-4"><Alert tone="warn">{notice}</Alert></div>}
 
@@ -50,9 +51,9 @@ export function UsersClient({ meId, users, invites }: { meId: string; users: U[]
         <table className="w-full text-left text-sm">
           <thead className="text-[13px] text-muted">
             <tr className="border-b border-line">
-              <th className="px-4 py-3 font-semibold">ผู้ใช้</th><th className="px-4 py-3 font-semibold">บทบาท</th>
-              <th className="px-4 py-3 font-semibold">สถานะ</th><th className="px-4 py-3 font-semibold">เข้าใช้ล่าสุด</th>
-              <th className="px-4 py-3 text-right font-semibold">การกระทำ</th>
+              <th className="px-4 py-3 font-semibold">{t("admin.users.colUser")}</th><th className="px-4 py-3 font-semibold">{t("admin.users.colRole")}</th>
+              <th className="px-4 py-3 font-semibold">{t("admin.users.colStatus")}</th><th className="px-4 py-3 font-semibold">{t("admin.users.colLast")}</th>
+              <th className="px-4 py-3 text-right font-semibold">{t("common.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -61,35 +62,35 @@ export function UsersClient({ meId, users, invites }: { meId: string; users: U[]
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
                     <span aria-hidden className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-hover text-xs">{u.displayName.slice(0, 1).toUpperCase()}</span>
-                    <div><div>{u.displayName}{u.id === meId && <span className="ml-2 text-xs text-muted">(คุณ)</span>}</div><div className="text-xs text-muted">{u.email}</div></div>
+                    <div><div>{u.displayName}{u.id === meId && <span className="ml-2 text-xs text-muted">{t("common.you")}</span>}</div><div className="text-xs text-muted">{u.email}</div></div>
                   </div>
                 </td>
                 <td className="px-4 py-3">{roleLabel(u.role)}</td>
-                <td className="px-4 py-3">{u.status === "active" ? "ใช้งาน" : <span className="text-red-300">ปิดบัญชี</span>}</td>
-                <td className="px-4 py-3 text-muted">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("th-TH") : "—"}</td>
+                <td className="px-4 py-3">{u.status === "active" ? t("common.active") : <span className="text-red-300">{t("common.disabled")}</span>}</td>
+                <td className="px-4 py-3 text-muted">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString(DATE_LOCALE[locale]) : "—"}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap justify-end gap-1.5">
                     {u.status === "active" ? (
                       <>
                         <Button variant="ghost" className="min-h-9 px-3" onClick={() => confirm({
-                          title: "เปลี่ยนบทบาท", label: "ยืนยัน", body: `เปลี่ยน ${u.displayName} เป็น ${roleLabel(u.role === "admin" ? "member" : "admin")}?`,
+                          title: t("admin.users.changeRole"), label: t("common.confirm"), body: t("admin.users.changeRoleBody", { name: u.displayName, role: roleLabel(u.role === "admin" ? "member" : "admin") }),
                           run: act(() => call(`/api/v1/admin/users/${u.id}`, "PATCH", { role: u.role === "admin" ? "member" : "admin" })),
-                        })}>เปลี่ยนบทบาท</Button>
+                        })}>{t("admin.users.changeRole")}</Button>
                         <Button variant="ghost" className="min-h-9 px-3" onClick={() => confirm({
-                          title: "รีเซ็ตรหัสผ่าน", label: "รีเซ็ตรหัสผ่าน", body: `สร้างรหัสผ่านชั่วคราวให้ ${u.displayName} — ผู้ใช้จะถูกออกจากระบบทุกอุปกรณ์และต้องตั้งรหัสใหม่ตอน login`,
+                          title: t("admin.users.resetPw"), label: t("admin.users.resetPw"), body: t("admin.users.resetPwBody", { name: u.displayName }),
                           run: async () => {
                             const r = await call(`/api/v1/admin/users/${u.id}/reset-password`, "POST");
-                            if (!r.ok) return errText[r.data.error] ?? "ดำเนินการไม่สำเร็จ";
+                            if (!r.ok) return apiError(r.data.error);
                             setModal({ k: "temp", name: u.displayName, password: r.data.temporaryPassword });
                           },
-                        })}>รีเซ็ตรหัสผ่าน</Button>
+                        })}>{t("admin.users.resetPw")}</Button>
                         {u.id !== meId && <Button variant="ghost" className="min-h-9 px-3 text-red-300" onClick={() => confirm({
-                          title: "ปิดบัญชี", danger: true, label: "ปิดบัญชี", body: `ปิดบัญชีของ ${u.displayName}? session ทั้งหมดจะหลุดทันที`,
+                          title: t("admin.users.disable"), danger: true, label: t("admin.users.disable"), body: t("admin.users.disableBody", { name: u.displayName }),
                           run: act(() => call(`/api/v1/admin/users/${u.id}`, "PATCH", { status: "disabled" })),
-                        })}>ปิดบัญชี</Button>}
+                        })}>{t("admin.users.disable")}</Button>}
                       </>
                     ) : (
-                      <Button variant="secondary" className="min-h-9 px-3" onClick={async () => { await call(`/api/v1/admin/users/${u.id}`, "PATCH", { status: "active" }); router.refresh(); }}>เปิดบัญชี</Button>
+                      <Button variant="secondary" className="min-h-9 px-3" onClick={async () => { await call(`/api/v1/admin/users/${u.id}`, "PATCH", { status: "active" }); router.refresh(); }}>{t("admin.users.enable")}</Button>
                     )}
                   </div>
                 </td>
@@ -99,10 +100,10 @@ export function UsersClient({ meId, users, invites }: { meId: string; users: U[]
               <tr key={i.id} className="border-b border-[var(--border-row)] last:border-0">
                 <td className="px-4 py-3"><div className="flex items-center gap-3"><span aria-hidden className="h-8 w-8 rounded-full border border-dashed border-line" /><div className="text-muted">{i.email}</div></div></td>
                 <td className="px-4 py-3">{roleLabel(i.role)}</td>
-                <td className="px-4 py-3"><span className="text-accent"><span aria-hidden>● </span>รอรับเชิญ</span></td>
-                <td className="px-4 py-3 text-xs text-muted">หมดอายุ {new Date(i.expiresAt).toLocaleDateString("th-TH")}</td>
+                <td className="px-4 py-3"><span className="text-accent"><span aria-hidden>● </span>{t("admin.users.pending")}</span></td>
+                <td className="px-4 py-3 text-xs text-muted">{t("admin.users.expires", { date: new Date(i.expiresAt).toLocaleDateString(DATE_LOCALE[locale]) })}</td>
                 <td className="px-4 py-3 text-right">
-                  <Button variant="ghost" className="min-h-9 px-3" onClick={async () => { await call(`/api/v1/admin/invites/${i.id}`, "DELETE"); router.refresh(); }}>ยกเลิกคำเชิญ</Button>
+                  <Button variant="ghost" className="min-h-9 px-3" onClick={async () => { await call(`/api/v1/admin/invites/${i.id}`, "DELETE"); router.refresh(); }}>{t("admin.users.revokeInvite")}</Button>
                 </td>
               </tr>
             ))}
@@ -112,23 +113,23 @@ export function UsersClient({ meId, users, invites }: { meId: string; users: U[]
 
       {modal?.k === "invite" && <InviteDialog onClose={() => setModal(null)} onDone={(r) => { setNotice(""); setModal({ k: "invite-result", ...r }); }} />}
       {modal?.k === "invite-result" && (
-        <Dialog title="สร้างลิงก์เชิญแล้ว" onClose={close}>
+        <Dialog title={t("admin.users.inviteCreated")} onClose={close}>
           <div className="space-y-4">
-            <Alert tone="info">เชิญ <b>{modal.email}</b> เป็น {roleLabel(modal.role)}</Alert>
+            <Alert tone="info">{t("admin.users.inviteLead")} <b>{modal.email}</b> {t("admin.users.inviteAs")} {roleLabel(modal.role)}</Alert>
             <CopyBox value={modal.link} />
-            <Alert tone="warn">ลิงก์นี้แสดงเต็มได้ครั้งเดียว ถ้าลืม copy ให้ยกเลิกคำเชิญแล้วสร้างใหม่</Alert>
-            <p className="text-xs text-muted">ใช้ได้ครั้งเดียว หมดอายุใน 7 วัน และใช้ได้กับอีเมลนี้เท่านั้น</p>
-            <div className="flex justify-end"><Button onClick={close}>เสร็จสิ้น</Button></div>
+            <Alert tone="warn">{t("admin.users.linkOnce")}</Alert>
+            <p className="text-xs text-muted">{t("admin.users.linkNote")}</p>
+            <div className="flex justify-end"><Button onClick={close}>{t("common.done")}</Button></div>
           </div>
         </Dialog>
       )}
       {modal?.k === "temp" && (
-        <Dialog title="รหัสผ่านชั่วคราว" onClose={close}>
+        <Dialog title={t("admin.users.tempPw")} onClose={close}>
           <div className="space-y-4">
-            <p className="text-sm text-text-2">รหัสผ่านชั่วคราวของ <b>{modal.name}</b></p>
+            <p className="text-sm text-text-2">{t("admin.users.tempPwOf")} <b>{modal.name}</b></p>
             <CopyBox value={modal.password} />
-            <Alert tone="warn">แสดงครั้งเดียว ส่งให้ผู้ใช้เอง ผู้ใช้ต้องตั้งรหัสใหม่ตอน login ครั้งแรก</Alert>
-            <div className="flex justify-end"><Button onClick={close}>เสร็จสิ้น</Button></div>
+            <Alert tone="warn">{t("admin.users.tempPwNote")}</Alert>
+            <div className="flex justify-end"><Button onClick={close}>{t("common.done")}</Button></div>
           </div>
         </Dialog>
       )}
@@ -138,6 +139,7 @@ export function UsersClient({ meId, users, invites }: { meId: string; users: U[]
 }
 
 function ConfirmDialog({ m, onClose, onDone }: { m: Extract<Modal, { k: "confirm" }>; onClose: () => void; onDone: () => void }) {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   return (
@@ -146,7 +148,7 @@ function ConfirmDialog({ m, onClose, onDone }: { m: Extract<Modal, { k: "confirm
         <p className="text-sm text-text-2">{m.body}</p>
         {err && <Alert>{err}</Alert>}
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>ยกเลิก</Button>
+          <Button variant="secondary" onClick={onClose}>{t("common.cancel")}</Button>
           <Button variant={m.danger ? "danger" : "primary"} disabled={busy} onClick={async () => {
             setBusy(true);
             const e = await m.run();
@@ -159,6 +161,7 @@ function ConfirmDialog({ m, onClose, onDone }: { m: Extract<Modal, { k: "confirm
 }
 
 function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: (r: { email: string; role: string; link: string }) => void }) {
+  const t = useT();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"member" | "admin">("member");
   const [err, setErr] = useState("");
@@ -168,26 +171,26 @@ function InviteDialog({ onClose, onDone }: { onClose: () => void; onDone: (r: { 
     setBusy(true); setErr("");
     const r = await call("/api/v1/admin/invites", "POST", { email, role });
     if (r.ok) return onDone(r.data);
-    setErr(r.data.error === "user_exists" && r.data.disabled ? "อีเมลนี้มีบัญชีอยู่แล้ว (ปิดบัญชีอยู่) ให้ไป \"เปิดบัญชี\" แทน" : errText[r.data.error] ?? "สร้างคำเชิญไม่สำเร็จ");
+    setErr(r.data.error === "user_exists" && r.data.disabled ? t("admin.users.existsDisabled") : apiError(r.data.error, "admin.users.inviteFailed"));
     setBusy(false);
   }
   return (
-    <Dialog title="เชิญด้วยอีเมล" onClose={onClose}>
+    <Dialog title={t("admin.users.inviteTitle")} onClose={onClose}>
       <form onSubmit={submit} className="space-y-4" noValidate>
         {err && <Alert>{err}</Alert>}
-        <Field label="อีเมล" type="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label={t("admin.users.email")} type="email" inputMode="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <fieldset className="space-y-1.5">
-          <legend className="text-[13px] font-semibold text-muted">บทบาท</legend>
+          <legend className="text-[13px] font-semibold text-muted">{t("admin.users.colRole")}</legend>
           {(["member", "admin"] as const).map((r) => (
             <label key={r} className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
               <input type="radio" name="role" checked={role === r} onChange={() => setRole(r)} /> {roleLabel(r)}
             </label>
           ))}
         </fieldset>
-        <Alert tone="info">ไม่มีการส่งอีเมลในเฟส 1 ระบบจะสร้างลิงก์ให้ copy ส่งเอง</Alert>
+        <Alert tone="info">{t("admin.users.noEmail")}</Alert>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>ยกเลิก</Button>
-          <Button type="submit" disabled={busy || !email}>สร้างลิงก์เชิญ</Button>
+          <Button type="button" variant="secondary" onClick={onClose}>{t("common.cancel")}</Button>
+          <Button type="submit" disabled={busy || !email}>{t("admin.users.createLink")}</Button>
         </div>
       </form>
     </Dialog>

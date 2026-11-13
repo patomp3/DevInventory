@@ -38,6 +38,8 @@ export const users = pgTable("users", {
   isSuperAdmin: boolean("is_super_admin").notNull().default(false),
   status: text("status").notNull().default("active"),
   mustChangePassword: boolean("must_change_password").notNull().default(false),
+  locale: text("locale").notNull().default("th"), // th | en (migration 0005)
+  theme: text("theme").notNull().default("dark"), // dark | light (migration 0006)
   lastLoginAt: ts("last_login_at"),
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),

@@ -10,11 +10,14 @@ import { orNotFound, requireCtx } from "@/lib/auth/session";
 import { listAttachments } from "@/lib/attachments";
 import { listWritableCollections } from "@/lib/collections";
 import { getItemDetail } from "@/lib/items";
+import { getT } from "@/lib/i18n/server";
+import { DATE_LOCALE } from "@/lib/i18n/locales";
 
 /** หน้ารายละเอียด (ui-design §7.4) — ทุกรายการเป็น Note: เนื้อหา Markdown (code fence มี highlight + Copy) */
 export default async function ItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { ctx, user } = await requireCtx();
+  const { t, locale } = await getT();
   const item = await orNotFound(getItemDetail(ctx, id));
   const [targets, files] = await Promise.all([item.canManage ? listWritableCollections(ctx) : Promise.resolve([]), listAttachments(ctx, id)]);
   return (
@@ -30,7 +33,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
             <VisibilityBadge value={item.effectiveVisibility} />
           </div>
           <h1 className="break-words text-2xl font-semibold">{item.title}</h1>
-          <p className="mt-1 text-xs text-muted">โดย {item.ownerName} · แก้ไขล่าสุด {item.updatedAt.toLocaleString("th-TH")} · v{item.version}</p>
+          <p className="mt-1 text-xs text-muted">{t("item.meta", { owner: item.ownerName, when: item.updatedAt.toLocaleString(DATE_LOCALE[locale]), v: item.version })}</p>
         </div>
         <ItemActions id={id} canEdit={item.canEdit} canManage={item.canManage} visibility={item.visibility} effective={item.effectiveVisibility}
           hasCollection={!!item.collectionId} collectionId={item.collectionId} targets={targets.map((t) => ({ id: t.id, name: t.name, level: t.level, path: t.path }))} />
@@ -39,7 +42,7 @@ export default async function ItemPage({ params }: { params: Promise<{ id: strin
       {item.tags.length > 0 && <div className="mt-3"><TagChips tags={item.tags} /></div>}
       {item.body
         ? <div className="mt-6 rounded-xl border border-line bg-sidebar p-5"><MarkdownView source={item.body} /></div>
-        : <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">ยังไม่มีเนื้อหา</p>}
+        : <p className="mt-6 rounded-xl border border-dashed border-line p-6 text-center text-sm text-muted">{t("item.noContent")}</p>}
       <AttachmentList items={files} />
     </article>
   );

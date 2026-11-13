@@ -4,6 +4,8 @@ import { cache } from "react";
 import { getAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { toLocale, type Locale } from "@/lib/i18n/locales";
+import { toTheme, type Theme } from "@/lib/theme";
 import type { Ctx, Role } from "@/lib/permissions";
 
 export type SessionUser = {
@@ -14,6 +16,8 @@ export type SessionUser = {
   workspaceId: string;
   mustChangePassword: boolean;
   isSuperAdmin: boolean;
+  locale: Locale;
+  theme: Theme;
 };
 
 /** อ่าน session แล้วตรวจสถานะผู้ใช้จาก DB ทุกครั้ง (ผู้ใช้ที่ถูกปิดบัญชีใช้งานต่อไม่ได้ทันที) */
@@ -25,7 +29,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   if (!u || u.status !== "active" || !u.workspaceId) return null;
   return {
     id: u.id, email: u.email, displayName: u.displayName, role: u.role, workspaceId: u.workspaceId,
-    mustChangePassword: u.mustChangePassword, isSuperAdmin: u.isSuperAdmin,
+    mustChangePassword: u.mustChangePassword, isSuperAdmin: u.isSuperAdmin, locale: toLocale(u.locale), theme: toTheme(u.theme),
   };
 });
 

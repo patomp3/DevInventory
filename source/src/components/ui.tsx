@@ -1,4 +1,5 @@
 "use client";
+import { useT } from "@/components/LocaleProvider";
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from "react";
 
 const btn = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed";
@@ -33,6 +34,7 @@ export function Alert({ tone = "error", children }: { tone?: "error" | "info" | 
 }
 
 export function Dialog({ title, onClose, children, width = 560 }: { title: string; onClose: () => void; children: ReactNode; width?: number }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   // เก็บ onClose ล่าสุดไว้ใน ref: ผู้เรียกส่งฟังก์ชันใหม่ทุกครั้งที่ render ถ้าใส่ใน deps ของ effect
   // จะ focus ซ้ำทุกครั้งที่พิมพ์ (โฟกัสเด้งไปที่ปุ่ม ✕) — ต้อง focus เฉพาะตอนเปิด dialog ครั้งเดียว
@@ -42,7 +44,7 @@ export function Dialog({ title, onClose, children, width = 560 }: { title: strin
     const prev = document.activeElement as HTMLElement | null;
     // ช่องกรอก/select ก่อน (ไม่ใช่ปุ่ม ✕ ที่อยู่แรกสุดใน DOM); ไม่มีช่องกรอกจึงค่อยเป็นปุ่ม
     const root = ref.current;
-    (root?.querySelector<HTMLElement>("input:not([type=hidden]),textarea,select") ?? root?.querySelector<HTMLElement>("button:not([aria-label=ปิด])") ?? root?.querySelector<HTMLElement>("button"))?.focus();
+    (root?.querySelector<HTMLElement>("input:not([type=hidden]),textarea,select") ?? root?.querySelector<HTMLElement>("button:not([data-dialog-close])") ?? root?.querySelector<HTMLElement>("button"))?.focus();
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     document.addEventListener("keydown", onKey);
     return () => { document.removeEventListener("keydown", onKey); prev?.focus(); };
@@ -53,7 +55,7 @@ export function Dialog({ title, onClose, children, width = 560 }: { title: strin
         className="w-full rounded-[14px] border border-line bg-sidebar p-6 shadow-[0_24px_60px_rgba(0,0,0,.55)]">
         <div className="mb-4 flex items-start justify-between gap-4">
           <h2 className="text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} aria-label="ปิด" className="rounded-md px-2 py-1 text-muted hover:bg-surface-hover">✕</button>
+          <button onClick={onClose} data-dialog-close aria-label={t("common.close")} className="rounded-md px-2 py-1 text-muted hover:bg-surface-hover">✕</button>
         </div>
         {children}
       </div>
@@ -75,13 +77,14 @@ export function ConfirmDialog({ title, children, confirmLabel, danger = false, b
   title: string; children: ReactNode; confirmLabel: string; danger?: boolean; busy?: boolean; error?: string;
   onConfirm: () => void; onClose: () => void;
 }) {
+  const t = useT();
   return (
     <Dialog title={title} onClose={() => !busy && onClose()} width={480}>
       <div className="space-y-4">
         {error && <Alert>{error}</Alert>}
         <div className="space-y-2 text-sm text-text-2">{children}</div>
         <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose} disabled={busy}>ยกเลิก</Button>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>{t("common.cancel")}</Button>
           <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} disabled={busy}>{confirmLabel}</Button>
         </div>
       </div>

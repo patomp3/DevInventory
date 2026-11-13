@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useT } from "@/components/LocaleProvider";
 import { api, PermissionDialog } from "@/components/PermissionDialog";
 import { CollectionPicker, type PickTarget } from "@/components/CollectionPicker";
 import { Alert, Button, Dialog } from "@/components/ui";
@@ -13,24 +14,25 @@ export function ItemActions({ id, canEdit, canManage, visibility, effective, has
   id: string; canEdit: boolean; canManage: boolean; visibility: Setting; effective: Effective; hasCollection: boolean; collectionId: string | null; targets: Target[];
 }) {
   const router = useRouter();
+  const t = useT();
   const [dlg, setDlg] = useState<"perm" | "move" | "delete" | null>(null);
   const [err, setErr] = useState("");
   const [dest, setDest] = useState<string>(collectionId ?? "");
   const close = () => { setDlg(null); setErr(""); };
   return (
     <div className="flex flex-wrap gap-2">
-      <Link href={`/i/${id}/history`} className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 text-sm text-text-2 hover:bg-surface-hover">ประวัติ</Link>
-      {canEdit && <Link href={`/i/${id}/edit`} className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:brightness-110">แก้ไข</Link>}
+      <Link href={`/i/${id}/history`} className="inline-flex min-h-11 items-center rounded-lg border border-line px-4 text-sm text-text-2 hover:bg-surface-hover">{t("item.history")}</Link>
+      {canEdit && <Link href={`/i/${id}/edit`} className="inline-flex min-h-11 items-center rounded-lg bg-accent px-4 text-sm font-medium text-on-accent hover:brightness-110">{t("item.edit")}</Link>}
       {canManage && (
         <>
-          <Button variant="secondary" onClick={() => setDlg("perm")}>เปลี่ยนสิทธิ์</Button>
-          <Button variant="secondary" onClick={() => setDlg("move")}>ย้าย</Button>
-          <Button variant="ghost" className="text-red-300" onClick={() => setDlg("delete")}>ลบ</Button>
+          <Button variant="secondary" onClick={() => setDlg("perm")}>{t("vis.changePerm")}</Button>
+          <Button variant="secondary" onClick={() => setDlg("move")}>{t("common.move")}</Button>
+          <Button variant="ghost" className="text-red-300" onClick={() => setDlg("delete")}>{t("common.delete")}</Button>
         </>
       )}
       {dlg === "perm" && (
-        <PermissionDialog title="สิทธิ์ของรายการ" current={visibility} effective={effective} canInherit={hasCollection}
-          widerWarning="เปิดกว้างกว่า Collection แม่ได้ แต่ผู้ที่ไม่มีสิทธิ์ดู Collection จะเห็นรายการนี้โดยไม่เห็นชื่อ Collection"
+        <PermissionDialog title={t("item.permTitle")} current={visibility} effective={effective} canInherit={hasCollection}
+          widerWarning={t("item.permWarn")}
           onClose={close}
           onSave={async (v) => {
             const r = await api(`/api/v1/items/${id}/visibility`, "PATCH", { visibility: v });
@@ -39,38 +41,38 @@ export function ItemActions({ id, canEdit, canManage, visibility, effective, has
           }} />
       )}
       {dlg === "move" && (
-        <Dialog title="ย้ายรายการ" onClose={close} width={460}>
+        <Dialog title={t("move.title")} onClose={close} width={460}>
           <div className="space-y-4">
             {err && <Alert>{err}</Alert>}
             <div className="space-y-1.5">
-              <p className="text-[13px] font-semibold text-muted">ปลายทาง</p>
+              <p className="text-[13px] font-semibold text-muted">{t("move.destination")}</p>
               <CollectionPicker targets={targets} value={dest} onChange={setDest} currentId={collectionId} />
-              <p className="text-xs text-muted">คลิกเพื่อเลือก หรือพิมพ์ชื่อ Collection เพื่อค้นหา · ↑ ↓ เลื่อน · Enter เลือก</p>
+              <p className="text-xs text-muted">{t("picker.hint")}</p>
             </div>
-            <Alert tone="warn">ถ้ารายการตั้งสิทธิ์ “ตาม Collection” สิทธิ์จะเปลี่ยนตามปลายทาง (Inbox ใช้ค่าเริ่มต้นของทีม) ตรวจสอบก่อนย้าย</Alert>
+            <Alert tone="warn">{t("move.warn")}</Alert>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={close}>ยกเลิก</Button>
+              <Button variant="secondary" onClick={close}>{t("common.cancel")}</Button>
               <Button disabled={dest === (collectionId ?? "")} onClick={async () => {
                 const r = await api(`/api/v1/items/${id}/move`, "PATCH", { collectionId: dest || null });
                 if (!r.ok) return setErr(r.error!);
                 close(); router.refresh();
-              }}>ย้าย</Button>
+              }}>{t("common.move")}</Button>
             </div>
           </div>
         </Dialog>
       )}
       {dlg === "delete" && (
-        <Dialog title="ลบรายการ" onClose={close} width={460}>
+        <Dialog title={t("item.deleteTitle")} onClose={close} width={460}>
           <div className="space-y-4">
             {err && <Alert>{err}</Alert>}
-            <p className="text-sm text-text-2">ย้ายรายการนี้ไปถังขยะ? (หน้าถังขยะสำหรับกู้คืนจะเปิดใช้ในสัปดาห์ 7)</p>
+            <p className="text-sm text-text-2">{t("item.deleteBody")}</p>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={close}>ยกเลิก</Button>
+              <Button variant="secondary" onClick={close}>{t("common.cancel")}</Button>
               <Button variant="danger" onClick={async () => {
                 const r = await api(`/api/v1/items/${id}`, "DELETE");
                 if (!r.ok) return setErr(r.error!);
                 router.push(collectionId ? `/c/${collectionId}` : "/inbox"); router.refresh();
-              }}>ลบ</Button>
+              }}>{t("common.delete")}</Button>
             </div>
           </div>
         </Dialog>

@@ -7,6 +7,27 @@
   --border: #262b33;       --border-nav: #232830;    --border-row: #1e232a; --border-strong: #2f3640;
   --text: #e7eaf0;         --text-secondary: #c3cad6; --text-muted: #98a2b3; --text-faint: #7d8797;
   --accent: #f2b84b;       --accent-soft: rgb(242 184 75 / 0.14); --on-accent: #1a1305;
+  /* สีโค้ด (Shiki + CodeMirror) ui-design §3.1 */
+  --syn-key: #7cb7ff; --syn-str: #a5d6a7; --syn-comment: #7d8797; --syn-text: #c3cad6; --syn-bright: #e7eaf0;
+  --syn-del: #f28b82; --syn-link: #f2b84b; --syn-mark: #98a2b3;
+  --editor-line: rgb(255 255 255 / 0.05); --editor-select: rgb(242 184 75 / 0.22);
+  color-scheme: dark;
+}
+
+/* ธีมสว่าง (เลือกจากปุ่มธีม เก็บต่อผู้ใช้) — ค่าสีเน้นดูให้ตัวอักษรบนพื้นขาวผ่านคอนทราสต์ AA */
+:root[data-theme="light"] {
+  --bg: #f4f5f7;           --sidebar: #ffffff;       --surface: #ffffff;
+  --surface-hover: #edeff3; --code-bg: #f1f3f6;
+  --border: #d6dbe3;       --border-nav: #dde1e8;    --border-row: #e6e9ef; --border-strong: #c3c9d4;
+  --text: #14181f;         --text-secondary: #364152; --text-muted: #566174; --text-faint: #657084;
+  --accent: #a16207;       --accent-soft: rgb(161 98 7 / 0.12); --on-accent: #ffffff;
+  --syn-key: #0b5cad; --syn-str: #1a7f37; --syn-comment: #6b7686; --syn-text: #2b3340; --syn-bright: #11151b;
+  --syn-del: #c0362c; --syn-link: #9a6700; --syn-mark: #566174;
+  --editor-line: rgb(0 0 0 / 0.05); --editor-select: rgb(161 98 7 / 0.2);
+  /* สีแดง/เขียวของ Tailwind ที่ใช้เป็นตัวอักษรต้องเข้มขึ้นบนพื้นสว่าง */
+  --color-red-200: #991b1b; --color-red-300: #b91c1c;
+  --color-emerald-200: #065f46; --color-emerald-300: #047857;
+  color-scheme: light;
 }
 
 @theme inline {
